@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Deck AI — Prévia Dev 3</title>
+  <style>
+    :root{--bg:#f5f6fa;--panel:#fff;--ink:#18202b;--muted:#6b7280;--line:#e7e9ef;--purple:#6d4aff;--green:#138a5b;--orange:#c67512;--red:#b84444;--shadow:0 14px 40px #1e22400d}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}button{font:inherit;cursor:pointer;border:0}.app{display:flex;min-height:100vh}.side{width:248px;background:#151326;color:#fff;padding:24px 16px}.brand{font-size:21px;font-weight:750;padding:0 12px 28px}.brand span{color:#9e8aff}.nav{display:grid;gap:6px}.nav button{background:transparent;color:#b9b6c8;text-align:left;padding:12px;border-radius:9px}.nav button:hover,.nav button.active{background:#292442;color:#fff}.side-note{position:absolute;bottom:20px;width:210px;border:1px solid #393351;border-radius:12px;padding:13px;color:#b9b6c8;font-size:12px;line-height:1.5}.main{flex:1;padding:28px 34px;max-width:1440px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px}.eyebrow{text-transform:uppercase;letter-spacing:.11em;color:var(--purple);font-size:11px;font-weight:800}.title{font-size:30px;letter-spacing:-.04em;margin:5px 0}.subtitle{color:var(--muted);margin:0}.user{display:flex;align-items:center;gap:10px}.avatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#ded7ff;color:#533ad0;font-weight:800}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}.card,.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}.card{padding:18px}.card-label{color:var(--muted);font-size:12px}.metric{font-size:28px;font-weight:750;margin-top:8px}.trend{font-size:12px;color:var(--green);margin-top:6px}.layout{display:grid;grid-template-columns:1.35fr 1fr;gap:20px}.panel{padding:20px}.panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.panel h2{font-size:16px;margin:0}.link{color:var(--purple);background:none;font-size:12px}.row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--line)}.row:last-child{border-bottom:0}.row-main{display:flex;align-items:center;gap:12px}.doc{width:35px;height:35px;border-radius:9px;background:#f0edff;color:var(--purple);display:grid;place-items:center;font-weight:750}.small{font-size:12px;color:var(--muted);margin-top:4px}.badge{font-size:11px;border-radius:999px;padding:5px 9px;font-weight:700}.approved{background:#e5f7ee;color:var(--green)}.review{background:#fff3dd;color:var(--orange)}.expired{background:#fde8e8;color:var(--red)}.queued{background:#eeeaff;color:#5a43d2}.actions{display:flex;gap:8px}.primary{background:var(--purple);color:#fff;border-radius:8px;padding:10px 14px;font-weight:700}.secondary{background:#f1efff;color:#5a43d2;border-radius:8px;padding:10px 14px;font-weight:700}.ghost{background:transparent;color:var(--muted);padding:7px}.activity{display:grid;gap:13px}.activity-item{display:flex;gap:10px;line-height:1.4}.dot{width:8px;height:8px;border-radius:50%;background:var(--purple);margin-top:6px;flex:0 0 auto}.modal-wrap{display:none;position:fixed;inset:0;background:#16132666;align-items:center;justify-content:center;padding:20px}.modal{width:min(520px,100%);background:#fff;border-radius:16px;padding:24px;box-shadow:0 20px 80px #0003}.modal h2{margin-top:0}.modal p{color:var(--muted);line-height:1.6}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:22px}@media(max-width:900px){.side{width:190px}.grid{grid-template-columns:repeat(2,1fr)}.layout{grid-template-columns:1fr}}@media(max-width:620px){.side{display:none}.main{padding:20px}.grid{grid-template-columns:1fr}.top{align-items:flex-start;gap:16px;flex-direction:column}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="side">
+      <div class="brand">deck<span>ai</span></div>
+      <nav class="nav">
+        <button class="active">Visão geral</button>
+        <button onclick="show('Apresentações')">Apresentações</button>
+        <button onclick="show('Biblioteca Jump')">Biblioteca Jump</button>
+        <button onclick="show('Exportações')">Exportações</button>
+        <button onclick="show('Usuários e permissões')">Usuários e permissões</button>
+      </nav>
+      <div class="side-note"><b>Prévia local</b><br>Dados simulados para testar o fluxo do Desenvolvedor 3.</div>
+    </aside>
+    <main class="main">
+      <header class="top">
+        <div><div class="eyebrow">Plataforma e conteúdo</div><h1 class="title">Visão geral</h1><p class="subtitle">Acompanhe apresentações, conteúdo aprovado e exportações.</p></div>
+        <div class="user"><span>Marina, administradora</span><div class="avatar">M</div></div>
+      </header>
+      <section class="grid">
+        <div class="card"><div class="card-label">Apresentações salvas</div><div class="metric">24</div><div class="trend">+4 esta semana</div></div>
+        <div class="card"><div class="card-label">Conteúdos aprovados</div><div class="metric">86</div><div class="trend">94% dentro da validade</div></div>
+        <div class="card"><div class="card-label">Exportações no mês</div><div class="metric">41</div><div class="trend">98% concluídas</div></div>
+        <div class="card"><div class="card-label">Revisões pendentes</div><div class="metric">7</div><div class="trend" style="color:var(--orange)">Aguardando responsável</div></div>
+      </section>
+      <section class="layout">
+        <div class="panel"><div class="panel-head"><h2>Conteúdo Jump recente</h2><button class="link" onclick="show('Biblioteca Jump')">Ver biblioteca →</button></div>
+          <div class="row"><div class="row-main"><div class="doc">C</div><div><b>Case — Cliente Horizonte</b><div class="small">Case · atualizado há 2 dias</div></div></div><span class="badge approved">Aprovado</span></div>
+          <div class="row"><div class="row-main"><div class="doc">N</div><div><b>Números institucionais 2026</b><div class="small">Indicadores · válido até 31/12/2026</div></div></div><span class="badge approved">Aprovado</span></div>
+          <div class="row"><div class="row-main"><div class="doc">S</div><div><b>Descrição do Serviço X</b><div class="small">Serviços · enviado por Rafael</div></div></div><span class="badge review">Em revisão</span></div>
+          <div class="row"><div class="row-main"><div class="doc">I</div><div><b>Imagem da equipe comercial</b><div class="small">Imagens · validade encerrada</div></div></div><span class="badge expired">Vencido</span></div>
+        </div>
+        <div class="panel"><div class="panel-head"><h2>Fila de exportações</h2><button class="link" onclick="show('Exportações')">Ver fila →</button></div>
+          <div class="row"><div><b>Proposta Horizonte</b><div class="small">PPTX · versão 7</div></div><span class="badge queued">Processando</span></div>
+          <div class="row"><div><b>Resultados Q3</b><div class="small">PDF · versão 3</div></div><span class="badge approved">Concluído</span></div>
+          <div class="row"><div><b>Onboarding Jump</b><div class="small">PPTX · versão 2</div></div><span class="badge review">Retentativa 2/3</span></div>
+          <button class="secondary" style="margin-top:14px" onclick="show('Nova exportação')">Solicitar exportação</button>
+        </div>
+      </section>
+      <section class="panel" style="margin-top:20px"><div class="panel-head"><h2>Atividade recente</h2><button class="primary" onclick="show('Novo conteúdo Jump')">+ Adicionar conteúdo</button></div>
+        <div class="activity"><div class="activity-item"><span class="dot"></span><div><b>Camila aprovou “Case — Cliente Horizonte”</b><div class="small">Há 18 minutos · fonte: documento institucional, página 12</div></div></div><div class="activity-item"><span class="dot"></span><div><b>Exportação PPTX iniciada</b><div class="small">Proposta Horizonte · job_91 · tentativa 1</div></div></div><div class="activity-item"><span class="dot"></span><div><b>Nova versão criada</b><div class="small">Resultados Q3 · versão 3 · por Marina</div></div></div></div>
+      </section>
+    </main>
+  </div>
+  <div class="modal-wrap" id="modal"><div class="modal"><h2 id="modalTitle">Ação</h2><p id="modalText"></p><div class="modal-actions"><button class="ghost" onclick="closeModal()">Fechar</button><button class="primary" onclick="closeModal()">Entendi</button></div></div></div>
+  <script>
+    function show(name){document.getElementById('modalTitle').textContent=name;document.getElementById('modalText').textContent='Esta é uma simulação da área “'+name+'”. Na aplicação real, aqui entrariam os dados do banco, as permissões e os jobs correspondentes.';document.getElementById('modal').style.display='flex'}
+    function closeModal(){document.getElementById('modal').style.display='none'}
+    document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()})
+  </script>
+</body>
+</html>
