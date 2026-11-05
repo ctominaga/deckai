@@ -1,0 +1,22 @@
+{
+  "jobs": [
+    {
+      "jobId": "job_demo_001",
+      "type": "export_pptx",
+      "status": "running",
+      "attempt": 1,
+      "maxAttempts": 3,
+      "idempotencyKey": "pres_demo_001:ver_demo_003:pptx",
+      "error": null
+    },
+    {
+      "jobId": "job_demo_002",
+      "type": "export_pdf",
+      "status": "succeeded",
+      "attempt": 1,
+      "maxAttempts": 3,
+      "idempotencyKey": "pres_demo_001:ver_demo_003:pdf",
+      "error": null
+    }
+  ]
+}

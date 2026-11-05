@@ -1,0 +1,40 @@
+{
+  "presentationId": "pres_demo_001",
+  "title": "Proposta institucional Jump",
+  "status": "draft",
+  "currentVersionId": "ver_demo_003",
+  "versions": [
+    {
+      "versionId": "ver_demo_003",
+      "versionNumber": 3,
+      "schemaVersion": "1.0",
+      "createdBy": "Marina",
+      "createdAt": "2026-11-05T12:00:00Z",
+      "content": {
+        "schemaVersion": "1.0",
+        "canvas": { "width": 1920, "height": 1080, "ratio": "16:9" },
+        "themeId": "jump-editorial",
+        "slides": [
+          {
+            "slideId": "slide_001",
+            "layout": "cover",
+            "blocks": [
+              { "id": "block_001", "type": "text", "role": "title", "text": "Tecnologia que transforma decisões" },
+              { "id": "block_002", "type": "text", "role": "subtitle", "text": "Proposta institucional Jump" }
+            ],
+            "references": []
+          },
+          {
+            "slideId": "slide_002",
+            "layout": "metrics",
+            "blocks": [
+              { "id": "block_003", "type": "metric", "label": "Empresas atendidas", "value": "+60", "unit": "clientes" },
+              { "id": "block_004", "type": "metric", "label": "Equipe qualificada", "value": "+80%", "unit": "especialistas" }
+            ],
+            "references": ["ref_jump_001"]
+          }
+        ]
+      }
+    }
+  ]
+}

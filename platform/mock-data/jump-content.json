@@ -1,0 +1,34 @@
+{
+  "items": [
+    {
+      "contentId": "jump_demo_001",
+      "title": "Sobre a Jump",
+      "category": "institucional",
+      "status": "approved",
+      "validUntil": "2027-12-31",
+      "body": "A Jump atua com tecnologia, dados, inteligência artificial e nuvem.",
+      "source": { "label": "Site institucional", "locator": "sobre a Jump" },
+      "tags": ["empresa", "institucional"]
+    },
+    {
+      "contentId": "jump_demo_002",
+      "title": "Número de empresas atendidas",
+      "category": "indicadores",
+      "status": "approved",
+      "validUntil": "2027-12-31",
+      "body": "+60 empresas atendidas.",
+      "source": { "label": "Relatório institucional", "locator": "página 2" },
+      "tags": ["número", "resultado"]
+    },
+    {
+      "contentId": "jump_demo_003",
+      "title": "Case antigo",
+      "category": "cases",
+      "status": "expired",
+      "validUntil": "2025-12-31",
+      "body": "Conteúdo vencido, não elegível para a IA.",
+      "source": { "label": "Documento antigo", "locator": "página 1" },
+      "tags": ["case"]
+    }
+  ]
+}
