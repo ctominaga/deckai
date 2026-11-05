@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deckai.local/schemas/presentation-1.0.json",
+  "title": "Deck AI Presentation",
+  "type": "object",
+  "required": ["schemaVersion", "canvas", "themeId", "slides"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "canvas": {
+      "type": "object",
+      "required": ["width", "height", "ratio"],
+      "properties": {
+        "width": { "const": 1920 },
+        "height": { "const": 1080 },
+        "ratio": { "const": "16:9" }
+      },
+      "additionalProperties": false
+    },
+    "themeId": { "type": "string", "minLength": 1 },
+    "slides": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["slideId", "layout", "blocks", "references"],
+        "properties": {
+          "slideId": { "type": "string", "minLength": 1 },
+          "layout": {
+            "enum": ["cover", "text_image", "two_columns", "metrics", "case", "closing"]
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "type"],
+              "properties": {
+                "id": { "type": "string", "minLength": 1 },
+                "type": { "enum": ["text", "image", "metric", "list", "shape"] },
+                "role": { "type": "string" },
+                "text": { "type": "string" },
+                "assetId": { "type": "string" },
+                "value": { "type": "string" },
+                "label": { "type": "string" },
+                "unit": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "references": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
