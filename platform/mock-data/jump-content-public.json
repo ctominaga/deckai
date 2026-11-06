@@ -1,0 +1,64 @@
+{
+  "source": {
+    "type": "public_website",
+    "url": "https://jump.tec.br/sobre-nos/",
+    "capturedAt": "2026-11-06",
+    "approvalRequired": true
+  },
+  "items": [
+    {
+      "contentId": "public_jump_about_001",
+      "title": "Descrição institucional",
+      "category": "historia",
+      "status": "in_review",
+      "body": "A Jump se apresenta como uma empresa de tecnologia e dados, com atuação no Brasil e em Portugal, especializada em soluções tecnológicas, dados, inteligência artificial e nuvem.",
+      "source": { "url": "https://jump.tec.br/sobre-nos/", "locator": "Sobre nós / Quem é a Jump" },
+      "tags": ["institucional", "empresa", "tecnologia", "dados", "IA", "nuvem"]
+    },
+    {
+      "contentId": "public_jump_history_001",
+      "title": "História institucional",
+      "category": "historia",
+      "status": "in_review",
+      "body": "A página institucional informa uma trajetória iniciada em 2014, com marcos de validação em 2016, estruturação em 2018, escala em 2020, expansão em 2022, globalização em 2024 e evolução em 2026.",
+      "source": { "url": "https://jump.tec.br/sobre-nos/", "locator": "Sobre nós / Timeline" },
+      "tags": ["historia", "timeline", "institucional"]
+    },
+    {
+      "contentId": "public_jump_metrics_001",
+      "title": "Indicadores institucionais publicados",
+      "category": "numeros",
+      "status": "in_review",
+      "body": "A página apresenta os indicadores: 10+ anos de mercado, 262 especialistas, atuação em 2 países e 200+ projetos entregues.",
+      "source": { "url": "https://jump.tec.br/sobre-nos/", "locator": "Sobre nós / Indicadores" },
+      "tags": ["numeros", "resultados", "institucional"]
+    },
+    {
+      "contentId": "public_jump_capabilities_001",
+      "title": "Capacidades e áreas de atuação",
+      "category": "servicos",
+      "status": "in_review",
+      "body": "A página lista IA generativa, cloud computing, engenharia de dados e data analytics como verticais, além de desenvolvimento de software e BPO & Martech entre as capacidades apresentadas.",
+      "source": { "url": "https://jump.tec.br/sobre-nos/", "locator": "Navegação / Verticais e rodapé" },
+      "tags": ["servicos", "capacidades", "IA", "cloud", "dados"]
+    },
+    {
+      "contentId": "public_jump_products_001",
+      "title": "Produtos do ecossistema",
+      "category": "produtos",
+      "status": "in_review",
+      "body": "A página relaciona Tractix, OPT-3, MigrateMind, Radar AI, NautilusIQ, TaxFlow e JHub no ecossistema Jump.",
+      "source": { "url": "https://jump.tec.br/sobre-nos/", "locator": "Ecossistema Jump / Soluções" },
+      "tags": ["produtos", "ecossistema", "institucional"]
+    },
+    {
+      "contentId": "public_jump_certifications_001",
+      "title": "Parcerias e certificações",
+      "category": "credenciais",
+      "status": "in_review",
+      "body": "A página informa parceria AWS Select e lista certificações ISO 27001, ISO 27701, ISO 42001, ISO 9001, ISO 14001, ISO 26000 e ISO 27007.",
+      "source": { "url": "https://jump.tec.br/sobre-nos/", "locator": "Sobre nós / Parcerias e certificações" },
+      "tags": ["certificacoes", "AWS", "governanca", "seguranca"]
+    }
+  ]
+}
