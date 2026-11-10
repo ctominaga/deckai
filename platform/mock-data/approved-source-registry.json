@@ -1,0 +1,17 @@
+{
+  "sources": [
+    {
+      "sourceId": "source_jump_bradesco_20262245",
+      "label": "PTC 20262245 - Bradesco - Squad Modernização v4.0.pptx",
+      "sourceType": "user_provided_presentation",
+      "approvalStatus": "approved",
+      "scope": "client_specific_confidential",
+      "localPath": "C:\\Users\\pedro\\Downloads\\PTC 20262245 - Bradesco - Squad Modernização v4.0.pptx",
+      "approvedBy": "user",
+      "approvedAt": "2026-11-10",
+      "repositoryPolicy": "do_not_commit_raw_content_to_public_repository",
+      "aiPolicy": "usable_only_in_authorized_private_context",
+      "notes": "A fonte foi aprovada pelo usuário para uso no Deck AI, mas contém informações específicas de cliente e cláusulas confidenciais. O arquivo original permanece fora do repositório."
+    }
+  ]
+}

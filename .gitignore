@@ -1,0 +1,10 @@
+# Fontes e materiais confidenciais não devem entrar no repositório público.
+private-data/
+*.pptx
+*.ppt
+*.pdf
+*.xlsx
+*.xls
+*.docx
+*.doc
+*.zip
