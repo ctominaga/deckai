@@ -8,3 +8,12 @@ private-data/
 *.docx
 *.doc
 *.zip
+
+# Desenvolvimento local
+node_modules/
+.env
+.env.*
+.env.local
+!.env.example
+playwright-report/
+test-results/

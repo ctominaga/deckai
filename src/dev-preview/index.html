@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f4f0">
+    <title>DeckAI — Dev Preview</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="DeckAI Dev Preview, início">
+        <span class="brand-mark">D</span>
+        <span>DeckAI <span class="brand-muted">/ laboratório de IA</span></span>
+      </a>
+      <span id="mode-badge" class="mode-badge">Modo mock · simulação</span>
+    </header>
+
+    <main class="page">
+      <section class="intro">
+        <p class="eyebrow">PROTÓTIPO LOCAL · ETAPA 9</p>
+        <h1>Transforme um briefing<br>em uma apresentação.</h1>
+        <p class="intro-copy">Crie roteiros com Mock ou Gemini, edite manualmente, revise e aprove. Depois, gere o conteúdo dos slides com o mesmo provedor. Os resultados ficam na memória deste processo.</p>
+      </section>
+
+      <div id="status-message" class="status-message" role="status" aria-live="polite"></div>
+      <div id="error-message" class="error-message" role="alert" aria-live="assertive" hidden></div>
+
+      <section class="workspace" aria-label="Fluxo de geração">
+        <aside class="briefing-panel panel">
+          <div class="panel-heading">
+            <div class="step-number">01</div>
+            <div>
+              <p class="eyebrow">COMECE POR AQUI</p>
+              <h2>Briefing</h2>
+            </div>
+          </div>
+          <form id="briefing-form">
+            <label for="provider">Provedor de geração</label>
+            <select id="provider" name="provider" aria-describedby="provider-hint">
+              <option value="mock" selected>Mock — Simulação</option>
+              <option value="gemini">Gemini — IA real</option>
+              <option value="deepseek">DeepSeek — IA real</option>
+            </select>
+            <p id="provider-hint" class="field-hint">Gemini é acionado somente nos botões de geração. Os slides exigem roteiro aprovado e um novo clique. Alterar o briefing ou o modo exige gerar e aprovar um novo roteiro.</p>
+            <label for="prompt">O que você quer apresentar?</label>
+            <textarea id="prompt" name="prompt" rows="4" required>Crie uma apresentação demonstrativa sobre uma iniciativa comunitária fictícia de troca de livros.</textarea>
+
+            <label for="objective">Objetivo</label>
+            <input id="objective" name="objective" value="Apresentar o Projeto Horizonte" required>
+
+            <label for="audience">Público-alvo</label>
+            <input id="audience" name="audience" value="moradores interessados em iniciativas comunitárias" required>
+
+            <div class="field-row">
+              <div>
+                <label for="tone">Tom</label>
+                <input id="tone" name="tone" value="acolhedor" required>
+              </div>
+              <div>
+                <label for="language">Idioma</label>
+                <input id="language" name="language" value="pt-BR" required>
+              </div>
+            </div>
+
+            <label for="slide-count">Quantidade de slides</label>
+            <input id="slide-count" name="slideCount" type="number" min="1" max="12" value="6" required>
+
+            <button id="generate-script-button" class="button button-primary" type="submit">
+              <span>Gerar roteiro</span><span aria-hidden="true">→</span>
+            </button>
+            <p class="field-hint">Entre 1 e 12 slides. As sugestões usam layouts demonstrativos.</p>
+          </form>
+        </aside>
+
+        <section class="results-column">
+          <article class="panel script-panel">
+            <div class="panel-heading">
+              <div class="step-number">02</div>
+              <div>
+                <p class="eyebrow">ESTRUTURA DA HISTÓRIA</p>
+                <h2>Roteiro</h2>
+              </div>
+              <span id="script-status" class="state-badge">Aguardando briefing</span>
+            </div>
+            <div id="script-content" class="empty-state">
+              <div class="empty-icon" aria-hidden="true">✳</div>
+              <p>Seu roteiro aparecerá aqui.</p>
+              <span>Preencha o briefing e gere uma proposta para começar.</span>
+            </div>
+            <details id="script-json-details" class="json-details" hidden>
+              <summary>Consultar JSON do roteiro</summary>
+              <pre id="script-json"></pre>
+            </details>
+            <button id="approve-button" class="button button-secondary" type="button" disabled>
+              <span>Aprovar roteiro</span><span aria-hidden="true">✓</span>
+            </button>
+          </article>
+
+          <article class="panel presentation-panel">
+            <div class="panel-heading">
+              <div class="step-number">03</div>
+              <div>
+                <p class="eyebrow">CONTEÚDO DOS SLIDES</p>
+                <h2>Apresentação</h2>
+              </div>
+              <span id="presentation-provider" class="mock-label">Slides ainda não gerados</span>
+            </div>
+            <div id="presentation-content" class="empty-state compact-empty">
+              <div class="empty-icon" aria-hidden="true">▤</div>
+              <p>A apresentação ainda não foi gerada.</p>
+              <span>Aprove o roteiro para liberar a geração.</span>
+            </div>
+            <button id="generate-presentation-button" class="button button-dark" type="button" disabled>
+              <span>Gerar apresentação</span><span aria-hidden="true">✦</span>
+            </button>
+            <details id="json-details" class="json-details" hidden>
+              <summary>Consultar JSON completo</summary>
+              <pre id="presentation-json"></pre>
+            </details>
+          </article>
+        </section>
+      </section>
+      <footer>DeckAI Dev Preview <span>·</span> ambiente local descartável <span>·</span> dados de demonstração</footer>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f4f0">
+    <title>DeckAI — Gerar com IA</title>
+    <link rel="stylesheet" href="/ai/styles.css">
+    <script src="/ai/app.js" defer></script>
+      <link rel="stylesheet" href="ai-shell.css">
+    <script src="/ai/shared-json.js" defer></script>
+    <script src="/ai/workflow.js" defer></script>
+  </head>
+  <body>
+    <div class="official-shell">
+    <aside class="official-side">
+      <a class="official-brand" href="/">deck<span>ai</span></a>
+      <button id="toggle-site-nav" type="button" aria-controls="site-nav" aria-expanded="false">Menu do DeckAI</button>
+      <nav id="site-nav" class="official-nav" aria-label="Navegação principal">
+        <a href="/">Visão geral</a>
+        <a href="gerar-ia.html" class="active" aria-current="page">Gerar com IA</a>
+        <a href="prototipo.html#presentations">Apresentações</a>
+        <a href="prototipo.html#jump">Biblioteca Jump</a>
+        <a href="prototipo.html#jobs">Exportações</a>
+        <a href="/?area=usuarios">Usuários e permissões</a>
+        <a href="prototipo.html">Abrir protótipo funcional →</a>
+      </nav>
+      <p class="official-note">Ambiente local · dados demonstrativos.<br>A biblioteca Jump simulada não é fonte da IA.</p>
+    </aside>
+    <main class="page">
+      <section class="intro">
+        <p class="eyebrow">DECKAI · CRIAÇÃO DE APRESENTAÇÕES</p>
+        <span id="mode-badge" class="mode-badge">DeepSeek · IA real</span>
+        <h1>Gerar com IA</h1>
+        <p class="intro-copy">Do briefing aos slides, em três etapas. Revise e aprove antes de gerar.</p>
+      </section>
+
+      <div id="status-message" class="status-message" role="status" aria-live="polite"></div>
+      <div id="error-message" class="error-message" role="alert" aria-live="assertive" hidden></div>
+
+      <nav class="workflow-steps" aria-label="Etapas da criação">
+        <button id="tab-briefing" type="button" data-stage="briefing" aria-controls="stage-briefing" aria-current="step">1 · Briefing</button>
+        <button id="tab-script" type="button" data-stage="script" aria-controls="stage-script" disabled>2 · Roteiro</button>
+        <button id="tab-presentation" type="button" data-stage="presentation" aria-controls="stage-presentation" disabled>3 · Apresentação</button>
+      </nav>
+      <p id="workflow-guidance" class="workflow-guidance" role="status">Preencha o briefing para começar.</p>
+      <section class="workspace" id="ai-workflow" aria-label="Fluxo de geração">
+        <aside class="briefing-panel panel" id="stage-briefing" aria-labelledby="tab-briefing">
+          <div class="panel-heading">
+            <div class="step-number">01</div>
+            <div>
+              <p class="eyebrow">COMECE POR AQUI</p>
+              <h2>Briefing</h2>
+            </div>
+          </div>
+          <form id="briefing-form">
+            <label for="provider">Provedor de geração</label>
+            <select id="provider" name="provider" aria-describedby="provider-hint">
+              <option value="mock">Mock — Simulação</option>
+              <option value="gemini">Gemini — IA real</option>
+              <option value="deepseek" selected>DeepSeek — IA real</option>
+            </select>
+            <p id="provider-hint" class="field-hint">DeepSeek é a opção preferencial para uso real; Gemini continua disponível. Provedores reais são acionados somente nos botões de geração. Os slides exigem roteiro aprovado e um novo clique. Alterar o briefing ou o modo exige gerar e aprovar um novo roteiro.</p>
+            <label for="prompt">O que você quer apresentar?</label>
+            <textarea id="prompt" name="prompt" rows="4" required>Crie uma apresentação demonstrativa sobre uma iniciativa comunitária fictícia de troca de livros.</textarea>
+
+            <label for="objective">Objetivo</label>
+            <input id="objective" name="objective" value="Apresentar o Projeto Horizonte" required>
+
+            <label for="audience">Público-alvo</label>
+            <input id="audience" name="audience" value="moradores interessados em iniciativas comunitárias" required>
+
+            <div class="field-row">
+              <div>
+                <label for="tone">Tom</label>
+                <input id="tone" name="tone" value="acolhedor" required>
+              </div>
+              <div>
+                <label for="language">Idioma</label>
+                <input id="language" name="language" value="pt-BR" required>
+              </div>
+            </div>
+
+            <label for="slide-count">Quantidade de slides</label>
+            <input id="slide-count" name="slideCount" type="number" min="1" max="12" value="6" required>
+
+            <button id="generate-script-button" class="button button-primary" type="submit">
+              <span>Gerar roteiro</span><span aria-hidden="true">→</span>
+            </button>
+            <p class="field-hint">Entre 1 e 12 slides. As sugestões usam layouts demonstrativos.</p>
+          </form>
+        </aside>
+
+        <section class="results-column">
+          <article class="panel script-panel" id="stage-script" aria-labelledby="tab-script" hidden>
+            <div class="panel-heading">
+              <div class="step-number">02</div>
+              <div>
+                <p class="eyebrow">ESTRUTURA DA HISTÓRIA</p>
+                <h2>Roteiro</h2>
+              </div>
+              <span id="script-status" class="state-badge">Aguardando briefing</span>
+            </div>
+            <div class="script-workspace">
+            <nav id="script-slide-nav" class="slide-selector" aria-label="Slides do roteiro"></nav>
+            <div id="script-content" class="empty-state">
+              <div class="empty-icon" aria-hidden="true">✳</div>
+              <p>Seu roteiro aparecerá aqui.</p>
+              <span>Preencha o briefing e gere uma proposta para começar.</span>
+            </div>
+            </div>
+            <details id="script-json-details" class="json-details" hidden>
+              <summary>Consultar JSON do roteiro</summary>
+              <pre id="script-json"></pre>
+            </details>
+            <div class="workflow-actions">
+            <button id="approve-button" class="button button-secondary" type="button" disabled>
+              <span>Aprovar roteiro</span><span aria-hidden="true">✓</span>
+            </button>
+            <button id="generate-presentation-button" class="button button-dark" type="button" disabled>
+              <span>Gerar apresentação</span><span aria-hidden="true">✦</span>
+            </button>
+            </div>
+          </article>
+
+          <article class="panel presentation-panel" id="stage-presentation" aria-labelledby="tab-presentation" hidden>
+            <div class="panel-heading">
+              <div class="step-number">03</div>
+              <div>
+                <p class="eyebrow">CONTEÚDO DOS SLIDES</p>
+                <h2>Apresentação</h2>
+              </div>
+              <span id="presentation-provider" class="mock-label">Slides ainda não gerados</span>
+            </div>
+            <div class="viewer-controls">
+              <button id="previous-slide" class="small-button" type="button">← Anterior</button>
+              <p id="current-slide-label" aria-live="polite" aria-atomic="true"></p>
+              <button id="next-slide" class="small-button" type="button">Próximo →</button>
+            </div>
+            <div class="presentation-workspace">
+            <nav id="presentation-slide-nav" class="slide-selector" aria-label="Slides da apresentação"></nav>
+            <div id="presentation-content" class="empty-state compact-empty">
+              <div class="empty-icon" aria-hidden="true">▤</div>
+              <p>A apresentação ainda não foi gerada.</p>
+              <span>Aprove o roteiro para liberar a geração.</span>
+            </div>
+            </div>
+            <button type="button" class="small-button back-to-script" data-stage="script">← Voltar ao roteiro</button>
+            <details class="advanced-json"><summary>Avançado: JSON e contrato compartilhado</summary>
+            <details id="json-details" class="json-details" hidden>
+              <summary>Consultar JSON completo</summary>
+              <pre id="presentation-json"></pre>
+            </details>
+      <section class="panel shared-panel">
+        <h2>Contrato compartilhado</h2>
+        <p>A adaptação mantém o JSON original e registra campos sem equivalente. Imagens são placeholders; as referências são demonstrativas.</p>
+        <button id="shared-json-button" class="button button-secondary" type="button">Consultar JSON no schema oficial</button>
+        <p id="shared-json-status" role="status"></p>
+        <pre id="shared-json-output" hidden></pre>
+      </section>
+            </details>
+          </article>
+        </section>
+      </section>
+      <footer>DeckAI <span>·</span> ambiente local <span>·</span> dados de demonstração</footer>
+    </main>
+    </div>
+  </body>
+</html>

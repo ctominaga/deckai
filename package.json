@@ -1,0 +1,33 @@
+{
+  "name": "deckai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.9.0"
+  },
+  "scripts": {
+    "demo": "tsx src/main.ts",
+    "demo:workflow": "tsx src/workflow-demo.ts",
+    "demo:provider": "tsx src/provider-demo.ts",
+    "demo:gemini-outline": "tsx src/gemini-outline-demo.ts",
+    "dev:preview": "tsx src/dev-preview/server.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "dev:integrated": "node --env-file-if-exists=.env.local --import=tsx src/integrated/server.ts",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "@google/genai": "^2.32.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.4.4",
+    "vitest": "^4.1.12",
+    "ajv": "^8.17.1",
+    "@playwright/test": "^1.58.0"
+  }
+}

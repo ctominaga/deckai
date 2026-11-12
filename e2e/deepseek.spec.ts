@@ -1,0 +1,38 @@
+import { test, expect } from "@playwright/test";
+test.use({baseURL:"http://127.0.0.1:4185"});
+
+test("DeepSeek simulated transport follows edited approval and renders six layouts",async ({page}) => {
+  const external: string[]=[];
+  page.on("request",request => { if(!request.url().startsWith("http://127.0.0.1:"))external.push(request.url()); });
+  await page.goto("/gerar-ia.html");
+  await expect(page.locator("#provider option")).toHaveText(["Mock — Simulação","Gemini — IA real","DeepSeek — IA real"]);
+  await page.locator("#provider").selectOption("deepseek");
+  await expect(page.locator("#mode-badge")).toHaveText("DeepSeek · IA real");
+  await page.locator("#generate-script-button").click();
+  await expect(page.locator(".script-summary")).toContainText("DeepSeek");
+  await page.getByRole("button",{name:"Editar título",exact:true}).click();
+  await page.locator('[data-edit-field="scriptTitle"]').fill("DeepSeek: revisão manual");
+  await page.getByRole("button",{name:"Salvar alterações",exact:true}).click();
+  await expect(page.locator(".script-summary")).toContainText("Revisão 2");
+  await expect(page.locator("#generate-presentation-button")).toBeDisabled();
+  await page.locator("#approve-button").click();
+  await page.locator("#generate-presentation-button").click();
+  await expect(page.locator(".slide-card")).toHaveCount(6);
+  await expect(page.locator("#presentation-provider")).toContainText("DeepSeek");
+  await expect(page.locator(".presentation-title")).toHaveText("DeepSeek: revisão manual");
+  const original=JSON.parse(await page.locator("#presentation-json").textContent() ?? "{}");
+  expect(original.id).toContain("deepseek-");
+  await page.locator(".advanced-json > summary").click();
+  await page.locator("#shared-json-button").click();
+  await expect(page.locator("#shared-json-output")).toContainText('"schemaVersion": "1.0"');
+  await page.locator("#tab-briefing").click();
+  await page.locator("#provider").selectOption("gemini");
+  await expect(page.locator("#shared-json-output")).toBeHidden();
+  await page.locator("#generate-script-button").click();
+  await expect(page.locator(".script-summary")).toContainText("Gemini");
+  await page.locator("#approve-button").click();
+  await page.locator("#generate-presentation-button").click();
+  await expect(page.locator("#presentation-provider")).toContainText("Gemini");
+  await expect(page.locator(".slide-card")).toHaveCount(6);
+  expect(external).toEqual([]);
+});

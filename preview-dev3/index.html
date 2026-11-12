@@ -19,6 +19,7 @@
     .main{padding:34px 42px;max-width:1500px}.eyebrow{color:#70706b;font-size:10px;letter-spacing:.16em}.title{font-size:42px;font-weight:700;letter-spacing:-.065em;margin:8px 0 4px}.subtitle{font-size:15px}
     .top{margin-bottom:34px}.avatar{background:#d7ff45;color:#171717;border-radius:4px}.card,.panel{border-radius:3px;box-shadow:none}.card{padding:20px;border-top:3px solid #171717}.card-label{text-transform:uppercase;letter-spacing:.08em;font-size:10px}.metric{font-size:34px;letter-spacing:-.06em}.badge{border-radius:2px;text-transform:uppercase;letter-spacing:.05em;font-size:9px}.doc{border-radius:2px;background:#171717;color:#d7ff45}.primary{background:#171717;color:#d7ff45;border-radius:2px}.secondary{background:#d7ff45;color:#171717;border-radius:2px}.link{color:#171717;text-decoration:underline;text-underline-offset:3px}.row{padding:16px 0}.panel h2{letter-spacing:-.03em}.dot{background:#d7ff45}.modal{border-radius:3px}
   </style>
+  <link rel="stylesheet" href="ai-shell.css">
 </head>
 <body>
   <div class="app">
@@ -26,6 +27,7 @@
       <div class="brand">deck<span>ai</span></div>
       <nav class="nav">
         <button class="active">Visão geral</button>
+        <a class="ai-nav" href="gerar-ia.html">Gerar com IA</a>
         <button onclick="show('Apresentações')">Apresentações</button>
         <button onclick="show('Biblioteca Jump')">Biblioteca Jump</button>
         <button onclick="show('Exportações')">Exportações</button>
@@ -69,6 +71,7 @@
     function show(name){document.getElementById('modalTitle').textContent=name;document.getElementById('modalText').textContent='Esta é uma simulação da área “'+name+'”. Na aplicação real, aqui entrariam os dados do banco, as permissões e os jobs correspondentes.';document.getElementById('modal').style.display='flex'}
     function closeModal(){document.getElementById('modal').style.display='none'}
     document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()})
+    if(new URLSearchParams(location.search).get('area')==='usuarios')show('Usuários e permissões');
   </script>
 </body>
 </html>

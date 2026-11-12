@@ -1,0 +1,51 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "DeckAI — Iniciar frontend oficial",
+      "detail": "HTML oficial e API de IA na mesma origem: http://127.0.0.1:4174. Carrega .env.local; geração somente por clique.",
+      "type": "shell",
+      "command": "npm.cmd run dev:integrated",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "INTEGRATED_PORT": "4174"
+        }
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": false,
+        "close": false
+      }
+    },
+    {
+      "label": "DeckAI — Iniciar sistema integrado",
+      "detail": "Dashboard oficial + IA na mesma origem: http://127.0.0.1:4175. Carrega .env.local; geração somente por clique.",
+      "type": "shell",
+      "command": "npm.cmd run dev:integrated",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "INTEGRATED_PORT": "4175"
+        }
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": false,
+        "close": false
+      }
+    }
+  ]
+}
