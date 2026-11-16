@@ -1,5 +1,8 @@
 # Fontes e materiais confidenciais não devem entrar no repositório público.
 private-data/
+.env
+.env.*
+!.env.example
 *.pptx
 *.ppt
 *.pdf
