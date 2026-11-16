@@ -1,0 +1,10 @@
+{
+  "presentationId": "pres_demo_001",
+  "kitId": "institutional",
+  "objective": "Apresentar a Jump para uma empresa interessada em dados e IA",
+  "audience": "Diretoria de tecnologia",
+  "tone": "executivo e consultivo",
+  "slideCount": 6,
+  "jumpContext": ["public_jump_about_001", "public_jump_capabilities_001"],
+  "themeId": "jump-editorial"
+}

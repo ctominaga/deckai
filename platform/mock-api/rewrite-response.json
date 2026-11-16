@@ -1,0 +1,11 @@
+{
+  "requestId": "req_rewrite_001",
+  "jobId": "job_rewrite_001",
+  "status": "succeeded",
+  "target": { "slideId": "slide_generated_002", "blockId": "block_generated_002" },
+  "operation": "shorten",
+  "originalText": "A Jump atua com tecnologia, dados, inteligência artificial e nuvem.",
+  "rewrittenText": "Tecnologia, dados, IA e nuvem para decisões melhores.",
+  "references": ["public_jump_about_001"],
+  "warnings": []
+}

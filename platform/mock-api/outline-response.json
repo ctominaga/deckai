@@ -1,0 +1,17 @@
+{
+  "requestId": "req_outline_001",
+  "jobId": "job_outline_001",
+  "status": "succeeded",
+  "outlineId": "outline_001",
+  "briefing": { "objective": "Apresentar a Jump para uma empresa interessada em dados e IA", "audience": "Diretoria de tecnologia", "tone": "executivo e consultivo", "slideCount": 6 },
+  "slides": [
+    { "position": 1, "layout": "cover", "title": "Tecnologia que transforma decisões" },
+    { "position": 2, "layout": "text_image", "title": "Quem é a Jump" },
+    { "position": 3, "layout": "two_columns", "title": "Capacidades para operar dados e IA" },
+    { "position": 4, "layout": "metrics", "title": "Experiência e escala" },
+    { "position": 5, "layout": "case", "title": "Como trabalhamos" },
+    { "position": 6, "layout": "closing", "title": "Vamos transformar sua demanda em solução" }
+  ],
+  "warnings": [],
+  "requiresApproval": true
+}

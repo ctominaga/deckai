@@ -1,0 +1,15 @@
+{
+  "requestId": "req_regeneration_001",
+  "jobId": "job_regeneration_001",
+  "status": "succeeded",
+  "baseVersionId": "ver_demo_004",
+  "target": { "slideId": "slide_generated_002" },
+  "changedSlides": ["slide_generated_002"],
+  "preservedSlides": ["slide_generated_001"],
+  "replacement": {
+    "slideId": "slide_generated_002",
+    "layout": "text_image",
+    "blocks": [{ "id": "block_generated_002", "type": "text", "role": "body", "text": "A Jump combina estratégia, dados e tecnologia para criar soluções de impacto." }],
+    "references": ["public_jump_about_001"]
+  }
+}

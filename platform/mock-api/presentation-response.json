@@ -1,0 +1,28 @@
+{
+  "requestId": "req_generation_001",
+  "jobId": "job_generation_001",
+  "status": "succeeded",
+  "presentationVersionId": "ver_demo_004",
+  "schemaVersion": "1.0",
+  "content": {
+    "canvas": { "width": 1920, "height": 1080, "ratio": "16:9" },
+    "themeId": "jump-editorial",
+    "slides": [
+      {
+        "slideId": "slide_generated_001",
+        "layout": "cover",
+        "blocks": [{ "id": "block_generated_001", "type": "text", "role": "title", "text": "Tecnologia que transforma decisões" }],
+        "references": []
+      },
+      {
+        "slideId": "slide_generated_002",
+        "layout": "text_image",
+        "blocks": [{ "id": "block_generated_002", "type": "text", "role": "body", "text": "A Jump atua com tecnologia, dados, inteligência artificial e nuvem." }],
+        "references": ["public_jump_about_001"]
+      }
+    ]
+  },
+  "warnings": [],
+  "model": "mock-gemini",
+  "usage": { "inputTokens": 0, "outputTokens": 0, "estimatedCost": 0 }
+}
