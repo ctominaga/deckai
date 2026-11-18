@@ -86,6 +86,7 @@ Depois disso, substituir o `localStorage` por uma API e um banco reais.
 - API local simulada;
 - página local de teste da API;
 - visualizador local de apresentações, versões e slides;
+- editor local com novas versões e duplicação;
 - adaptador inicial para DeepSeek;
 - configuração segura por variável de ambiente;
 - commits sincronizados na branch `main`.
@@ -94,6 +95,7 @@ Depois disso, substituir o `localStorage` por uma API e um banco reais.
 
 - conectar o adaptador DeepSeek aos endpoints de IA;
 - conectar o visualizador ao JSON completo de layouts;
+- integrar o editor aos blocos completos do JSON;
 - integrar a API local com o protótipo visual;
 - definir o formato final dos contratos com o Desenvolvedor 2;
 - testar geração real com a chave local;
