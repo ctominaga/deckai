@@ -1,0 +1,9 @@
+{
+  "name": "deckai",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "api": "node platform/api/server.mjs",
+    "test": "node --test platform/api/*.test.mjs"
+  }
+}

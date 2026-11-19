@@ -19,7 +19,23 @@ O projeto está na fase de fundação local. Já existem:
 - prévia visual;
 - protótipo funcional local.
 
-Os módulos locais ainda não são backend de produção. Eles usam dados simulados e `localStorage`.
+Além dos módulos visuais em `localStorage`, já existe uma primeira API persistente de desenvolvimento. Ela oferece login, permissões, apresentações versionadas e aprovação de conteúdo Jump. O arquivo JSON usado localmente facilita os testes, mas ainda será substituído por PostgreSQL antes da produção.
+
+## Executar a API persistente
+
+Na raiz do repositório:
+
+```powershell
+node platform/api/server.mjs
+```
+
+A API fica disponível em `http://127.0.0.1:8788`. Consulte `platform/api/README.md` para criar o primeiro gestor e autenticar.
+
+Para executar os testes sem depender do comando `npm` no PowerShell:
+
+```powershell
+node --test platform/api/*.test.mjs
+```
 
 ## Abrir a prévia
 
@@ -59,6 +75,7 @@ platform/                plataforma, conteúdo Jump e exportações
 platform/local-store/    protótipos locais sem backend
 platform/mock-data/      dados de demonstração
 platform/validation/     validações locais
+platform/api/            API persistente de desenvolvimento
 preview-dev3/            prévia visual e protótipo funcional
 ```
 
@@ -72,7 +89,7 @@ Validar com os três desenvolvedores:
 4. contrato de criação de apresentação;
 5. contrato de exportação.
 
-Depois disso, substituir o `localStorage` por uma API e um banco reais.
+Depois disso, conectar as telas à nova API e migrar a persistência de desenvolvimento para PostgreSQL.
 
 ## Status de 16/11/2026
 
@@ -90,6 +107,13 @@ Depois disso, substituir o `localStorage` por uma API e um banco reais.
 - adaptador inicial para DeepSeek;
 - configuração segura por variável de ambiente;
 - commits sincronizados na branch `main`.
+- API persistente de desenvolvimento com autenticação e sessões;
+- permissões aplicadas pelo backend;
+- CRUD inicial de apresentações com histórico e conflito de versão;
+- fluxo Jump de rascunho, revisão, aprovação, rejeição e arquivamento;
+- filtro para fornecer à IA somente conteúdo aprovado e válido;
+- trilha básica de auditoria;
+- testes automatizados da autenticação, versionamento e política Jump.
 
 ### Em andamento
 
@@ -99,11 +123,12 @@ Depois disso, substituir o `localStorage` por uma API e um banco reais.
 - integrar a API local com o protótipo visual;
 - definir o formato final dos contratos com o Desenvolvedor 2;
 - testar geração real com a chave local;
+- substituir a persistência JSON de desenvolvimento por PostgreSQL;
 
 ### Pendentes
 
-- banco de dados real;
-- autenticação real;
+- banco PostgreSQL de produção;
+- tela de login conectada à autenticação já disponível na API;
 - storage privado;
 - fila e workers de produção;
 - integração real com Gemini;
