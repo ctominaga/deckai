@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Deck AI · Teste de API</title>
+  <style>
+    :root{--ink:#171717;--paper:#f1f0eb;--acid:#d7ff45;--line:#d8d7d0;--muted:#77766f}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:14px Arial,sans-serif}.page{max-width:1000px;margin:auto;padding:34px}.top{border-bottom:1px solid var(--ink);padding-bottom:22px;margin-bottom:22px}.kicker{text-transform:uppercase;letter-spacing:.16em;color:var(--muted);font-size:10px}h1{font-size:40px;letter-spacing:-.07em;margin:8px 0}.status{display:inline-block;padding:6px 9px;border:1px solid var(--ink);margin-top:8px}.ok{background:var(--acid)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{background:#fbfbf8;border:1px solid var(--line);padding:20px}.card h2{font-size:18px;margin:0 0 13px}.field{display:grid;gap:6px;margin:10px 0}.field label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}input,textarea{font:inherit;padding:10px;border:1px solid var(--line);width:100%}textarea{min-height:90px}.btn{background:var(--ink);color:var(--acid);border:1px solid var(--ink);padding:10px 13px;cursor:pointer;margin-top:6px}.output{white-space:pre-wrap;background:#171717;color:#d7ff45;padding:15px;min-height:180px;overflow:auto;font:12px Consolas,monospace}.wide{grid-column:1/-1}@media(max-width:720px){.page{padding:20px}.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body><main class="page">
+  <header class="top"><div class="kicker">Deck AI · integração local</div><h1>Teste da API</h1><div id="status" class="status">Verificando API...</div></header>
+  <div class="grid">
+    <section class="card"><h2>Gerar roteiro</h2><div class="field"><label>Objetivo</label><input id="objective" value="Apresentar a Jump para uma empresa interessada em dados e IA"></div><div class="field"><label>Público</label><input id="audience" value="Diretoria de tecnologia"></div><div class="field"><label>Tom</label><input id="tone" value="executivo e consultivo"></div><button class="btn" onclick="outline()">Chamar API de roteiro</button></section>
+    <section class="card"><h2>Gerar apresentação</h2><p>Usa a resposta simulada do Gemini e devolve o JSON da apresentação.</p><button class="btn" onclick="presentation()">Chamar API de apresentação</button><button class="btn" onclick="regenerate()">Regenerar slide 2</button><button class="btn" onclick="rewrite()">Reescrever bloco</button></section>
+    <section class="card wide"><h2>Resposta da API</h2><div id="output" class="output">Nenhuma chamada realizada.</div></section>
+  </div>
+</main>
+<script>
+const API='http://127.0.0.1:8787';const output=document.getElementById('output');
+async function call(path,options={}){output.textContent='Processando...';try{const response=await fetch(API+path,{headers:{'content-type':'application/json'},...options});const data=await response.json();output.textContent=JSON.stringify(data,null,2);return data}catch(error){output.textContent='Erro de conexão com a API. Confirme se o servidor está rodando em http://127.0.0.1:8787';throw error}}
+async function health(){try{const r=await fetch(API+'/health');if(r.ok){const e=document.getElementById('status');e.textContent='API conectada';e.className='status ok'}}catch{const e=document.getElementById('status');e.textContent='API offline';e.className='status'}}
+function jsonBody(){return JSON.stringify({objective:document.getElementById('objective').value,audience:document.getElementById('audience').value,tone:document.getElementById('tone').value,slideCount:6})}
+function outline(){return call('/api/ai/outline',{method:'POST',body:jsonBody()})}function presentation(){return call('/api/ai/presentation',{method:'POST',body:jsonBody()})}function regenerate(){return call('/api/ai/slides/slide_generated_002/regenerate',{method:'POST',body:JSON.stringify({instruction:'deixar mais executivo'})})}function rewrite(){return call('/api/ai/blocks/block_generated_002/rewrite',{method:'POST',body:JSON.stringify({operation:'shorten'})})}health();
+</script></body></html>
