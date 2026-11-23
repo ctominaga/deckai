@@ -172,8 +172,13 @@ Retorna o conteúdo, todas as versões e o histórico de submissão, aprovação
 - `POST /api/v1/jump-contents/:id/approve`
 - `POST /api/v1/jump-contents/:id/reject` com `{"note":"motivo obrigatório"}`
 - `POST /api/v1/jump-contents/:id/archive`
+- `POST /api/v1/jump-contents/:id/restore`
 
-A aprovação exige fonte, início e fim de validade. Transições inválidas retornam HTTP 409.
+A restauração transforma um item arquivado em rascunho e não recupera aprovação anterior. A aprovação exige fonte, início e fim de validade. Transições inválidas retornam HTTP 409.
+
+### `POST /api/v1/jump-contents/examples`
+
+Carrega seis exemplos extraídos do site institucional como rascunhos que ainda exigem revisão humana, definição de validade e aprovação. A operação é idempotente: chamadas posteriores ignoram os exemplos já existentes.
 
 ### `GET /api/v1/jump-context`
 

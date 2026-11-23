@@ -46,6 +46,8 @@ Por segurança, a API local não usa reinicialização automática enquanto PGli
 - Uma versão histórica pode ser restaurada como rascunho sem apagar versões posteriores.
 - A biblioteca Jump possui versões imutáveis, fonte obrigatória, validade, busca, tags e workflow editorial auditado.
 - A futura IA possui uma consulta separada que expõe somente conteúdo aprovado, vigente e sem alteração posterior à aprovação.
+- Conteúdos arquivados podem ser restaurados como rascunho, sem recuperar automaticamente a aprovação anterior.
+- Exemplos públicos podem ser carregados de forma idempotente, sempre como rascunhos sujeitos à revisão humana.
 
 ## Fluxo implementado
 

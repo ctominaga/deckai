@@ -174,6 +174,15 @@ describe("biblioteca Jump", () => {
     expect(context.json().items).toHaveLength(1);
     expect(context.json().items[0].sourceLabel).toBe(payload.sourceLabel);
 
+    const approvedDetail = await app.inject({ method: "GET", url: `/api/v1/jump-contents/${id}`, headers: { authorization } });
+    expect(approvedDetail.json().reviews[0].actorName).toBe("Gestor");
+    expect(approvedDetail.json().content.approvedBy).toBe("Gestor");
+    expect((await app.inject({ method: "POST", url: `/api/v1/jump-contents/${id}/archive`, headers: { authorization }, payload: {} })).json().status).toBe("archived");
+    const restored = await app.inject({ method: "POST", url: `/api/v1/jump-contents/${id}/restore`, headers: { authorization }, payload: {} });
+    expect(restored.statusCode).toBe(200);
+    expect(restored.json().status).toBe("draft");
+    expect((await app.inject({ method: "GET", url: "/api/v1/jump-context", headers: { authorization } })).json().items).toHaveLength(0);
+
     const changed = await app.inject({ method: "PUT", url: `/api/v1/jump-contents/${id}`, headers: { authorization }, payload: { ...payload, text: `${payload.text} Conteudo revisado.` } });
     expect(changed.statusCode).toBe(200);
     expect(changed.json().status).toBe("draft");
@@ -182,6 +191,21 @@ describe("biblioteca Jump", () => {
     const detail = await app.inject({ method: "GET", url: `/api/v1/jump-contents/${id}`, headers: { authorization } });
     expect(detail.json().versions).toHaveLength(2);
     expect(detail.json().reviews.map((review: { action: string }) => review.action)).toEqual(expect.arrayContaining(["submitted", "approved"]));
+  });
+
+  it("carrega exemplos publicos como rascunhos de forma idempotente", async () => {
+    const { app } = await setup();
+    const authorization = await bootstrapAndLogin(app);
+    const first = await app.inject({ method: "POST", url: "/api/v1/jump-contents/examples", headers: { authorization }, payload: {} });
+    expect(first.statusCode).toBe(201);
+    expect(first.json()).toMatchObject({ created: 6, skipped: 0, status: "draft" });
+    const replay = await app.inject({ method: "POST", url: "/api/v1/jump-contents/examples", headers: { authorization }, payload: {} });
+    expect(replay.statusCode).toBe(200);
+    expect(replay.json()).toMatchObject({ created: 0, skipped: 6, status: "draft" });
+    const list = await app.inject({ method: "GET", url: "/api/v1/jump-contents", headers: { authorization } });
+    expect(list.json().items).toHaveLength(6);
+    expect(list.json().items.every((item: { status: string }) => item.status === "draft")).toBe(true);
+    expect((await app.inject({ method: "GET", url: "/api/v1/jump-context", headers: { authorization } })).json().items).toHaveLength(0);
   });
 
   it("bloqueia gestao por editor e exclui conteudo vencido do contexto da IA", async () => {
