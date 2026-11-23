@@ -48,6 +48,8 @@ Por segurança, a API local não usa reinicialização automática enquanto PGli
 - A futura IA possui uma consulta separada que expõe somente conteúdo aprovado, vigente e sem alteração posterior à aprovação.
 - Conteúdos arquivados podem ser restaurados como rascunho, sem recuperar automaticamente a aprovação anterior.
 - Exemplos públicos podem ser carregados de forma idempotente, sempre como rascunhos sujeitos à revisão humana.
+- A geração de roteiro com DeepSeek possui validação estrutural, idempotência, persistência de diagnóstico e acesso somente ao conteúdo Jump elegível.
+- A chamada real de IA permanece desativada por padrão e exige chave fora do Git e habilitação explícita no ambiente.
 
 ## Fluxo implementado
 

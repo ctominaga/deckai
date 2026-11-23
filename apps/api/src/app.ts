@@ -8,8 +8,10 @@ import { registerAuthRoutes } from "./modules/auth-routes.js";
 import { registerPresentationRoutes } from "./modules/presentation-routes.js";
 import { registerMemberRoutes } from "./modules/member-routes.js";
 import { registerJumpRoutes } from "./modules/jump-routes.js";
+import { DeepSeekOutlineProvider, type OutlineProvider } from "./ai-provider.js";
+import { registerAiRoutes } from "./modules/ai-routes.js";
 
-export async function buildApp(database: Database) {
+export async function buildApp(database: Database, options: { outlineProvider?: OutlineProvider } = {}) {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test", genReqId: () => crypto.randomUUID() });
   await app.register(cors, { origin: process.env.WEB_ORIGIN ?? "http://localhost:5173", allowedHeaders: ["authorization", "content-type"], methods: ["GET", "POST", "PUT", "PATCH", "DELETE"] });
   await app.register(rateLimit, { global: false });
@@ -17,6 +19,7 @@ export async function buildApp(database: Database) {
   registerAuthRoutes(app, database);
   registerMemberRoutes(app, database);
   registerJumpRoutes(app, database);
+  registerAiRoutes(app, database, options.outlineProvider ?? new DeepSeekOutlineProvider());
   registerPresentationRoutes(app, database);
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof ZodError) return reply.code(422).send({ error: { code: "VALIDATION_ERROR", message: "Os dados enviados são inválidos.", details: error.issues, requestId: request.id, retryable: false } });

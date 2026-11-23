@@ -183,3 +183,38 @@ Carrega seis exemplos extraídos do site institucional como rascunhos que ainda 
 ### `GET /api/v1/jump-context`
 
 Contrato dedicado aos futuros jobs de IA. Retorna exclusivamente a versão atual de conteúdos aprovados, com fonte e vigentes na data da consulta. Aceita o filtro `q`; conteúdos vencidos, futuros, arquivados, rejeitados ou alterados depois da aprovação ficam de fora.
+
+## Geração assistida por IA
+
+### `POST /api/v1/ai/outlines`
+
+Gera e persiste um roteiro usando DeepSeek. A solicitação exige `idempotencyKey` UUID e um briefing com prompt, objetivo, público, tom, idioma e quantidade de slides. O backend fornece ao modelo somente conteúdo Jump aprovado e vigente, rejeita referências desconhecidas e registra modelo, duração, uso e erro sanitizado.
+
+```json
+{
+  "idempotencyKey": "uuid",
+  "provider": "deepseek",
+  "briefing": {
+    "prompt": "Crie uma proposta institucional",
+    "objective": "Apresentar a empresa",
+    "audience": "Diretoria de tecnologia",
+    "tone": "Executivo e consultivo",
+    "language": "pt-BR",
+    "slideCount": 6
+  }
+}
+```
+
+### `GET /api/v1/ai/outlines`
+
+Lista os roteiros persistidos da organização.
+
+### `GET /api/v1/ai/outlines/:id`
+
+Consulta um roteiro da organização autenticada.
+
+### `POST /api/v1/ai/outlines/:id/approve`
+
+Aprova um roteiro em rascunho usando controle otimista por `expectedRevision`. A geração da apresentação completa permanece uma etapa separada.
+
+Para habilitar chamadas reais, crie `.env.local` fora do Git com `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` e `DECKAI_ENABLE_REAL_DEEPSEEK=true`. Sem isso, o endpoint retorna erro controlado e não simula sucesso.

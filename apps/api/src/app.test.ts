@@ -4,14 +4,15 @@ import { buildApp } from "./app.js";
 import { createMemoryDatabase, type Database } from "./database.js";
 import { runMigrations } from "./migrations.js";
 import { hashPassword } from "./security.js";
+import type { OutlineProvider } from "./ai-provider.js";
 
 const resources: Array<{ app: Awaited<ReturnType<typeof buildApp>>; database: Database }> = [];
 afterEach(async () => { while (resources.length) { const item = resources.pop()!; await item.app.close(); await item.database.close(); } });
 
-async function setup() {
+async function setup(outlineProvider?: OutlineProvider) {
   const database = createMemoryDatabase();
   await runMigrations(database);
-  const app = await buildApp(database);
+  const app = await buildApp(database, outlineProvider ? { outlineProvider } : {});
   resources.push({ app, database });
   return { app, database };
 }
@@ -225,5 +226,37 @@ describe("biblioteca Jump", () => {
     const list = await app.inject({ method: "GET", url: "/api/v1/jump-contents", headers: { authorization: ownerAuthorization } });
     expect(list.json().items[0].effectiveStatus).toBe("expired");
     expect((await app.inject({ method: "GET", url: "/api/v1/jump-context", headers: { authorization: ownerAuthorization } })).json().items).toHaveLength(0);
+  });
+});
+
+describe("geracao de roteiro por IA", () => {
+  it("usa somente contexto Jump aprovado, persiste o roteiro e respeita idempotencia", async () => {
+    let calls = 0; let receivedContext: Array<{ id: string }> = [];
+    const provider: OutlineProvider = { name: "deepseek", model: "deepseek-test", async generateOutline(briefing, context) {
+      calls++; receivedContext = context;
+      return { title: briefing.objective, slides: Array.from({ length: briefing.slideCount }, (_, index) => ({
+        title: `Slide ${index + 1}`, objective: "Apresentar conteúdo validado", layout: index === 0 ? "cover" : "text_image",
+        keyPoints: ["Informação rastreável"], referenceIds: context[0] ? [context[0].id] : []
+      })), usage: { total_tokens: 123 } };
+    } };
+    const { app } = await setup(provider); const authorization = await bootstrapAndLogin(app);
+    const jumpPayload = { kind: "service", title: "Serviço aprovado", text: "Conteúdo institucional aprovado.", sourceLabel: "Fonte interna", validFrom: "2020-01-01", validUntil: "2099-12-31", tags: ["serviço"] };
+    const jump = await app.inject({ method: "POST", url: "/api/v1/jump-contents", headers: { authorization }, payload: jumpPayload });
+    const jumpId = jump.json().id as string;
+    await app.inject({ method: "POST", url: `/api/v1/jump-contents/${jumpId}/submit`, headers: { authorization }, payload: {} });
+    await app.inject({ method: "POST", url: `/api/v1/jump-contents/${jumpId}/approve`, headers: { authorization }, payload: {} });
+    await app.inject({ method: "POST", url: "/api/v1/jump-contents", headers: { authorization }, payload: { ...jumpPayload, title: "Rascunho não aprovado" } });
+
+    const idempotencyKey = randomUUID(); const requestPayload = { idempotencyKey, provider: "deepseek", briefing: { prompt: "Crie uma proposta", objective: "Proposta executiva", audience: "Diretoria", tone: "consultivo", language: "pt-BR", slideCount: 2 } };
+    const generated = await app.inject({ method: "POST", url: "/api/v1/ai/outlines", headers: { authorization }, payload: requestPayload });
+    expect(generated.statusCode).toBe(201);
+    expect(generated.json().outline.slides).toHaveLength(2);
+    expect(receivedContext.map(item => item.id)).toEqual([jumpId]);
+    const replay = await app.inject({ method: "POST", url: "/api/v1/ai/outlines", headers: { authorization }, payload: requestPayload });
+    expect(replay.statusCode).toBe(200); expect(replay.json().outline.id).toBe(generated.json().outline.id); expect(calls).toBe(1);
+    const approved = await app.inject({ method: "POST", url: `/api/v1/ai/outlines/${generated.json().outline.id as string}/approve`, headers: { authorization }, payload: { expectedRevision: 1 } });
+    expect(approved.statusCode).toBe(200); expect(approved.json().status).toBe("approved");
+    const listed = await app.inject({ method: "GET", url: "/api/v1/ai/outlines", headers: { authorization } });
+    expect(listed.json().items).toHaveLength(1); expect(listed.json().items[0].status).toBe("approved");
   });
 });

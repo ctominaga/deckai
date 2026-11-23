@@ -102,6 +102,36 @@ export const JumpListQuerySchema = z.object({
   kind: JumpKindSchema.optional()
 }).strict();
 export const JumpContextQuerySchema = z.object({ q: z.string().trim().max(200).optional() }).strict();
+export const AiBriefingSchema = z.object({
+  prompt: z.string().trim().min(1).max(10_000),
+  objective: z.string().trim().min(1).max(500),
+  audience: z.string().trim().min(1).max(300),
+  tone: z.string().trim().min(1).max(120),
+  language: z.string().trim().min(2).max(40).default("pt-BR"),
+  slideCount: z.number().int().min(1).max(12)
+}).strict();
+export const AiOutlineSlideSchema = z.object({
+  id: IdSchema,
+  title: z.string().trim().min(1).max(300),
+  objective: z.string().trim().min(1).max(1_000),
+  layout: LayoutSchema,
+  keyPoints: z.array(z.string().trim().min(1).max(1_000)).min(1).max(12),
+  referenceIds: z.array(IdSchema).max(30)
+}).strict();
+export const AiOutlineSchema = z.object({
+  id: IdSchema,
+  title: z.string().trim().min(1).max(180),
+  status: z.enum(["draft", "approved"]),
+  revision: z.number().int().positive(),
+  briefing: AiBriefingSchema,
+  slides: z.array(AiOutlineSlideSchema).min(1).max(12)
+}).strict();
+export const GenerateOutlineSchema = z.object({
+  idempotencyKey: IdSchema,
+  provider: z.literal("deepseek").default("deepseek"),
+  briefing: AiBriefingSchema
+}).strict();
+export const ApproveOutlineSchema = z.object({ expectedRevision: z.number().int().positive() }).strict();
 export const CreatePresentationSchema = z.object({ title: z.string().trim().min(1).max(180) });
 export const UpdatePresentationSchema = z.object({ title: z.string().trim().min(1).max(180) }).strict();
 export const SaveDraftSchema = z.object({
