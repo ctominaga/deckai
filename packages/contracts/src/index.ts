@@ -132,6 +132,10 @@ export const GenerateOutlineSchema = z.object({
   briefing: AiBriefingSchema
 }).strict();
 export const ApproveOutlineSchema = z.object({ expectedRevision: z.number().int().positive() }).strict();
+export const GeneratePresentationFromOutlineSchema = z.object({
+  idempotencyKey: IdSchema,
+  provider: z.literal("deepseek").default("deepseek")
+}).strict();
 export const CreatePresentationSchema = z.object({ title: z.string().trim().min(1).max(180) });
 export const UpdatePresentationSchema = z.object({ title: z.string().trim().min(1).max(180) }).strict();
 export const SaveDraftSchema = z.object({

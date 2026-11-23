@@ -231,13 +231,19 @@ describe("biblioteca Jump", () => {
 
 describe("geracao de roteiro por IA", () => {
   it("usa somente contexto Jump aprovado, persiste o roteiro e respeita idempotencia", async () => {
-    let calls = 0; let receivedContext: Array<{ id: string }> = [];
+    let calls = 0; let presentationCalls = 0; let receivedContext: Array<{ id: string }> = [];
     const provider: OutlineProvider = { name: "deepseek", model: "deepseek-test", async generateOutline(briefing, context) {
       calls++; receivedContext = context;
       return { title: briefing.objective, slides: Array.from({ length: briefing.slideCount }, (_, index) => ({
         title: `Slide ${index + 1}`, objective: "Apresentar conteúdo validado", layout: index === 0 ? "cover" : "text_image",
         keyPoints: ["Informação rastreável"], referenceIds: context[0] ? [context[0].id] : []
       })), usage: { total_tokens: 123 } };
+    }, async generatePresentation(outline, context) {
+      presentationCalls++;
+      return { slides: outline.slides.map(slide => ({ layout: slide.layout, referenceIds: context[0] ? [context[0].id] : [], blocks: [
+        { type: "text" as const, role: "title" as const, text: slide.title },
+        { type: "text" as const, role: "body" as const, text: "Conteúdo desenvolvido com fonte aprovada." }
+      ] })), usage: { total_tokens: 456 } };
     } };
     const { app } = await setup(provider); const authorization = await bootstrapAndLogin(app);
     const jumpPayload = { kind: "service", title: "Serviço aprovado", text: "Conteúdo institucional aprovado.", sourceLabel: "Fonte interna", validFrom: "2020-01-01", validUntil: "2099-12-31", tags: ["serviço"] };
@@ -256,6 +262,15 @@ describe("geracao de roteiro por IA", () => {
     expect(replay.statusCode).toBe(200); expect(replay.json().outline.id).toBe(generated.json().outline.id); expect(calls).toBe(1);
     const approved = await app.inject({ method: "POST", url: `/api/v1/ai/outlines/${generated.json().outline.id as string}/approve`, headers: { authorization }, payload: { expectedRevision: 1 } });
     expect(approved.statusCode).toBe(200); expect(approved.json().status).toBe("approved");
+    const presentationKey = randomUUID();
+    const presentation = await app.inject({ method: "POST", url: `/api/v1/ai/outlines/${generated.json().outline.id as string}/presentation`, headers: { authorization }, payload: { idempotencyKey: presentationKey, provider: "deepseek" } });
+    expect(presentation.statusCode).toBe(201);
+    const presentationId = presentation.json().presentation.id as string;
+    const editor = await app.inject({ method: "GET", url: `/api/v1/presentations/${presentationId}`, headers: { authorization } });
+    expect(editor.statusCode).toBe(200); expect(editor.json().draft.content.slides).toHaveLength(2);
+    expect(editor.json().draft.content.slides[0].references).toEqual([jumpId]);
+    const presentationReplay = await app.inject({ method: "POST", url: `/api/v1/ai/outlines/${generated.json().outline.id as string}/presentation`, headers: { authorization }, payload: { idempotencyKey: presentationKey, provider: "deepseek" } });
+    expect(presentationReplay.statusCode).toBe(200); expect(presentationReplay.json().presentation.id).toBe(presentationId); expect(presentationCalls).toBe(1);
     const listed = await app.inject({ method: "GET", url: "/api/v1/ai/outlines", headers: { authorization } });
     expect(listed.json().items).toHaveLength(1); expect(listed.json().items[0].status).toBe("approved");
   });

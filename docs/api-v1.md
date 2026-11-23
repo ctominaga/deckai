@@ -217,4 +217,8 @@ Consulta um roteiro da organização autenticada.
 
 Aprova um roteiro em rascunho usando controle otimista por `expectedRevision`. A geração da apresentação completa permanece uma etapa separada.
 
+### `POST /api/v1/ai/outlines/:id/presentation`
+
+Desenvolve os slides de um roteiro aprovado, valida quantidade, ordem, layouts, títulos e referências e persiste uma apresentação canônica com versão inicial e rascunho editável. A solicitação exige uma nova `idempotencyKey`; repeti-la retorna a mesma apresentação sem nova chamada ao provedor.
+
 Para habilitar chamadas reais, crie `.env.local` fora do Git com `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` e `DECKAI_ENABLE_REAL_DEEPSEEK=true`. Sem isso, o endpoint retorna erro controlado e não simula sucesso.

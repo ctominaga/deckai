@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import { AiOutlineSchema, ApproveOutlineSchema, GenerateOutlineSchema } from "@deckai/contracts";
+import { AiOutlineSchema, ApproveOutlineSchema, GenerateOutlineSchema, GeneratePresentationFromOutlineSchema, PresentationContentSchema } from "@deckai/contracts";
 import { AiProviderError, type ApprovedJumpContext, type OutlineProvider } from "../ai-provider.js";
 import { audit } from "../audit.js";
 import { authenticate, requireWrite } from "../auth.js";
 import type { Database } from "../database.js";
 import { AppError, notFound } from "../errors.js";
+import { contentHash } from "../security.js";
 
 type JobRow = { id: string; status: string; output: unknown; error: unknown };
 type OutlineRow = { id: string; title: string; status: "draft" | "approved"; revision: number; briefing: unknown; slides: unknown[]; createdAt: string; updatedAt: string };
@@ -78,5 +79,52 @@ export function registerAiRoutes(app: FastifyInstance, database: Database, provi
       return updated.rows[0];
     });
     return parseOutline(result);
+  });
+
+  app.post("/api/v1/ai/outlines/:id/presentation", async (request, reply) => {
+    const user = await authenticate(request, database); requireWrite(user); const { id } = request.params as { id: string };
+    const body = GeneratePresentationFromOutlineSchema.parse(request.body);
+    const prior = await database.query<JobRow>("SELECT id,status,output_json AS output,error_json AS error FROM ai_generation_jobs WHERE organization_id=$1 AND idempotency_key=$2", [user.organizationId, body.idempotencyKey]);
+    if (prior.rows[0]) {
+      if (prior.rows[0].status === "succeeded") return prior.rows[0].output;
+      throw new AppError(409, "AI_IDEMPOTENCY_CONFLICT", "Esta solicitação de IA já foi processada ou ainda está em andamento.", { jobId: prior.rows[0].id, status: prior.rows[0].status });
+    }
+    const outlineResult = await database.query<OutlineRow>(`${outlineSelect} WHERE id=$1 AND organization_id=$2`, [id, user.organizationId]);
+    if (!outlineResult.rows[0]) throw notFound("Roteiro");
+    const outline = parseOutline(outlineResult.rows[0]);
+    if (outline.status !== "approved") throw new AppError(409, "OUTLINE_NOT_APPROVED", "Aprove o roteiro antes de gerar os slides.");
+    const jobId = randomUUID(); const startedAt = Date.now();
+    await database.query(`INSERT INTO ai_generation_jobs (id,organization_id,requested_by,outline_id,kind,provider,model,prompt_version,status,idempotency_key,input_json)
+      VALUES ($1,$2,$3,$4,'presentation',$5,$6,'presentation-v1','running',$7,$8::jsonb)`, [jobId, user.organizationId, user.id, id, provider.name, provider.model, body.idempotencyKey, JSON.stringify({ outlineId: id, provider: body.provider })]);
+    try {
+      const contextResult = await database.query<ApprovedJumpContext>(`SELECT c.id,c.title,v.body_json->>'text' AS text,v.source_label AS "sourceLabel",v.source_url AS "sourceUrl"
+        FROM jump_contents c JOIN jump_content_versions v ON v.id=c.current_version_id AND v.content_id=c.id
+        WHERE c.organization_id=$1 AND c.status='approved' AND c.current_version_id=c.approved_version_id AND v.source_label<>''
+          AND (v.valid_from IS NULL OR v.valid_from<=CURRENT_DATE) AND (v.valid_until IS NULL OR v.valid_until>=CURRENT_DATE)
+        ORDER BY c.updated_at DESC LIMIT 50`, [user.organizationId]);
+      const generated = await provider.generatePresentation(outline, contextResult.rows);
+      const theme = await database.query<{ id: string }>("SELECT id FROM themes WHERE organization_id=$1 AND is_default=true LIMIT 1", [user.organizationId]);
+      if (!theme.rows[0]) throw new AppError(409, "DEFAULT_THEME_MISSING", "A organização não possui tema padrão.");
+      const content = PresentationContentSchema.parse({ schemaVersion: "1.0", canvas: { width: 1920, height: 1080, ratio: "16:9" }, themeId: theme.rows[0].id,
+        slides: generated.slides.map(slide => ({ slideId: randomUUID(), layout: slide.layout, references: slide.referenceIds,
+          blocks: slide.blocks.map(block => ({ ...block, id: randomUUID() })) })) });
+      const presentationId = randomUUID(), versionId = randomUUID(), mutationId = randomUUID();
+      const response = { job: { id: jobId, status: "succeeded", provider: provider.name, model: provider.model, durationMs: Date.now() - startedAt }, presentation: { id: presentationId, title: outline.title, versionId } };
+      await database.transaction(async (tx) => {
+        await tx.query("INSERT INTO presentations (id,organization_id,title,created_by) VALUES ($1,$2,$3,$4)", [presentationId, user.organizationId, outline.title, user.id]);
+        await tx.query(`INSERT INTO presentation_versions (id,organization_id,presentation_id,version_number,schema_version,state,content_json,content_hash,client_mutation_id,created_by)
+          VALUES ($1,$2,$3,1,'1.0','checkpoint',$4::jsonb,$5,$6,$7)`, [versionId, user.organizationId, presentationId, JSON.stringify(content), contentHash(content), mutationId, user.id]);
+        await tx.query("UPDATE presentations SET current_version_id=$1 WHERE id=$2 AND organization_id=$3", [versionId, presentationId, user.organizationId]);
+        await tx.query(`INSERT INTO presentation_drafts (presentation_id,organization_id,base_version_id,revision,content_json,last_mutation_id,updated_by)
+          VALUES ($1,$2,$3,1,$4::jsonb,$5,$6)`, [presentationId, user.organizationId, versionId, JSON.stringify(content), mutationId, user.id]);
+        await tx.query("UPDATE ai_generation_jobs SET status='succeeded',output_json=$1::jsonb,usage_json=$2::jsonb,duration_ms=$3,updated_at=now() WHERE id=$4 AND organization_id=$5", [JSON.stringify(response), JSON.stringify(generated.usage ?? {}), Date.now() - startedAt, jobId, user.organizationId]);
+        await audit(tx, { organizationId: user.organizationId, actorId: user.id, action: "ai.presentation.generate", entityType: "presentation", entityId: presentationId, requestId: request.id, metadata: { jobId, outlineId: id, provider: provider.name, model: provider.model } });
+      });
+      return reply.code(201).send(response);
+    } catch (error) {
+      const failure = error instanceof AiProviderError ? error : error instanceof AppError ? new AiProviderError(error.code, error.message, error.retryable, error.status) : new AiProviderError("AI_GENERATION_FAILED", "A geração da apresentação falhou.", false);
+      await database.query("UPDATE ai_generation_jobs SET status='failed',error_json=$1::jsonb,duration_ms=$2,updated_at=now() WHERE id=$3 AND organization_id=$4", [JSON.stringify({ code: failure.code, message: failure.message, retryable: failure.retryable }), Date.now() - startedAt, jobId, user.organizationId]);
+      throw new AppError(failure.status, failure.code, failure.message, { jobId }, failure.retryable);
+    }
   });
 }

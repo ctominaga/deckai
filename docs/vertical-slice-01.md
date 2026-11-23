@@ -50,6 +50,7 @@ Por segurança, a API local não usa reinicialização automática enquanto PGli
 - Exemplos públicos podem ser carregados de forma idempotente, sempre como rascunhos sujeitos à revisão humana.
 - A geração de roteiro com DeepSeek possui validação estrutural, idempotência, persistência de diagnóstico e acesso somente ao conteúdo Jump elegível.
 - A chamada real de IA permanece desativada por padrão e exige chave fora do Git e habilitação explícita no ambiente.
+- Um roteiro aprovado pode ser desenvolvido pela IA e convertido diretamente no mesmo JSON canônico usado pelo editor, autosave, preview e futuras exportações.
 
 ## Fluxo implementado
 
