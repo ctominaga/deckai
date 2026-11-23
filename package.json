@@ -2,8 +2,37 @@
   "name": "deckai",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "api": "node platform/api/server.mjs",
-    "test": "node --test platform/api/*.test.mjs"
+    "dev": "concurrently -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "tsx apps/api/src/server.ts",
+    "dev:web": "vite --config apps/web/vite.config.ts",
+    "build": "npm run typecheck && vite build --config apps/web/vite.config.ts",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:legacy": "node --test platform/api/*.test.mjs",
+    "db:migrate": "tsx apps/api/src/scripts/migrate.ts",
+    "db:seed": "tsx apps/api/src/scripts/seed.ts",
+    "legacy:api": "node platform/api/server.mjs"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.3.14",
+    "@fastify/cors": "^11.1.0",
+    "@fastify/rate-limit": "^10.3.0",
+    "fastify": "^5.6.2",
+    "pg": "^8.16.3",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/pg": "^8.15.6",
+    "concurrently": "^9.2.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.2",
+    "vitest": "^4.0.13"
   }
 }

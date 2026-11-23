@@ -1,0 +1,205 @@
+import { randomUUID } from "node:crypto";
+import { afterEach, describe, expect, it } from "vitest";
+import { buildApp } from "./app.js";
+import { createMemoryDatabase, type Database } from "./database.js";
+import { runMigrations } from "./migrations.js";
+import { hashPassword } from "./security.js";
+
+const resources: Array<{ app: Awaited<ReturnType<typeof buildApp>>; database: Database }> = [];
+afterEach(async () => { while (resources.length) { const item = resources.pop()!; await item.app.close(); await item.database.close(); } });
+
+async function setup() {
+  const database = createMemoryDatabase();
+  await runMigrations(database);
+  const app = await buildApp(database);
+  resources.push({ app, database });
+  return { app, database };
+}
+
+async function bootstrapAndLogin(app: Awaited<ReturnType<typeof buildApp>>) {
+  await app.inject({ method: "POST", url: "/api/v1/bootstrap", payload: { organizationName: "Jump", name: "Gestor", email: "gestor@jump.local", password: "senha-segura-123" } });
+  const login = await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { email: "gestor@jump.local", password: "senha-segura-123" } });
+  expect(login.statusCode).toBe(200);
+  return `Bearer ${login.json().token as string}`;
+}
+
+describe("primeira vertical slice", () => {
+  it("aplica a migration de forma idempotente", async () => {
+    const { database } = await setup();
+    expect(await runMigrations(database)).toEqual([]);
+    const result = await database.query<{ version: string }>("SELECT version FROM schema_migrations");
+    expect(result.rows.map((row) => row.version)).toContain("001_initial.sql");
+  });
+
+  it("cria organização, apresentação, autosave e checkpoint persistentes", async () => {
+    const { app } = await setup();
+    const authorization = await bootstrapAndLogin(app);
+    const created = await app.inject({ method: "POST", url: "/api/v1/presentations", headers: { authorization }, payload: { title: "Proposta real" } });
+    expect(created.statusCode).toBe(201);
+    const presentationId = created.json().presentationId as string;
+    const renamed = await app.inject({ method: "PATCH", url: `/api/v1/presentations/${presentationId}`, headers: { authorization }, payload: { title: "Proposta renomeada" } });
+    expect(renamed.statusCode).toBe(200); expect(renamed.json().title).toBe("Proposta renomeada");
+    const loaded = await app.inject({ method: "GET", url: `/api/v1/presentations/${presentationId}`, headers: { authorization } });
+    expect(loaded.statusCode).toBe(200);
+    const payload = loaded.json();
+    payload.draft.content.slides[0].blocks[0].text = "Título persistido";
+    const autosave = await app.inject({ method: "PUT", url: `/api/v1/presentations/${presentationId}/draft`, headers: { authorization }, payload: { baseVersionId: payload.draft.baseVersionId, expectedRevision: payload.draft.revision, clientMutationId: randomUUID(), content: payload.draft.content } });
+    expect(autosave.statusCode).toBe(200);
+    expect(autosave.json().revision).toBe(2);
+    const checkpoint = await app.inject({ method: "POST", url: `/api/v1/presentations/${presentationId}/checkpoints`, headers: { authorization }, payload: { baseVersionId: payload.draft.baseVersionId, draftRevision: 2, clientMutationId: randomUUID() } });
+    expect(checkpoint.statusCode).toBe(201);
+    expect(checkpoint.json().versionNumber).toBe(2);
+    const history = await app.inject({ method: "GET", url: `/api/v1/presentations/${presentationId}/versions`, headers: { authorization } });
+    expect(history.statusCode).toBe(200); expect(history.json().items).toHaveLength(2);
+    const reloaded = await app.inject({ method: "GET", url: `/api/v1/presentations/${presentationId}`, headers: { authorization } });
+    expect(reloaded.json().draft.content.slides[0].blocks[0].text).toBe("Título persistido");
+    const preview = await app.inject({ method: "GET", url: `/api/v1/presentations/${presentationId}/preview`, headers: { authorization } });
+    expect(preview.statusCode).toBe(200);
+    expect(preview.headers["content-type"]).toContain("text/html");
+    expect(preview.body).toContain("Título persistido");
+  });
+
+  it("rejeita autosave concorrente e esconde recursos de outra organização", async () => {
+    const { app, database } = await setup();
+    const authorization = await bootstrapAndLogin(app);
+    const created = await app.inject({ method: "POST", url: "/api/v1/presentations", headers: { authorization }, payload: { title: "Restrita" } });
+    const presentationId = created.json().presentationId as string;
+    const loaded = (await app.inject({ method: "GET", url: `/api/v1/presentations/${presentationId}`, headers: { authorization } })).json();
+    const first = { baseVersionId: loaded.draft.baseVersionId, expectedRevision: 1, clientMutationId: randomUUID(), content: loaded.draft.content };
+    expect((await app.inject({ method: "PUT", url: `/api/v1/presentations/${presentationId}/draft`, headers: { authorization }, payload: first })).statusCode).toBe(200);
+    expect((await app.inject({ method: "PUT", url: `/api/v1/presentations/${presentationId}/draft`, headers: { authorization }, payload: { ...first, clientMutationId: randomUUID() } })).statusCode).toBe(409);
+
+    const organizationId = randomUUID(), userId = randomUUID();
+    await database.query("INSERT INTO organizations(id,name,slug) VALUES($1,'Outra','outra')", [organizationId]);
+    await database.query("INSERT INTO users(id,organization_id,name,email,password_hash,role) VALUES($1,$2,'Outro','outro@jump.local',$3,'owner')", [userId, organizationId, await hashPassword("senha-segura-456")]);
+    const login = await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { email: "outro@jump.local", password: "senha-segura-456" } });
+    const otherAuthorization = `Bearer ${login.json().token as string}`;
+    const forbidden = await app.inject({ method: "GET", url: `/api/v1/presentations/${presentationId}`, headers: { authorization: otherAuthorization } });
+    expect(forbidden.statusCode).toBe(404);
+  });
+
+  it("repete autosave antigo de forma idempotente e controla checkpoints concorrentes", async () => {
+    const { app } = await setup(); const authorization = await bootstrapAndLogin(app);
+    const created = await app.inject({ method: "POST", url: "/api/v1/presentations", headers: { authorization }, payload: { title: "Idempotente" } });
+    const id = created.json().presentationId as string;
+    const loaded = (await app.inject({ method: "GET", url: `/api/v1/presentations/${id}`, headers: { authorization } })).json();
+    const mutationA = randomUUID();
+    const requestA = { baseVersionId: loaded.draft.baseVersionId, expectedRevision: 1, clientMutationId: mutationA, content: loaded.draft.content };
+    const first = await app.inject({ method: "PUT", url: `/api/v1/presentations/${id}/draft`, headers: { authorization }, payload: requestA });
+    expect(first.statusCode).toBe(200);
+    const changedContent = structuredClone(loaded.draft.content); changedContent.slides[0].blocks[0].text = "Segunda alteração";
+    const second = await app.inject({ method: "PUT", url: `/api/v1/presentations/${id}/draft`, headers: { authorization }, payload: { ...requestA, expectedRevision: 2, clientMutationId: randomUUID(), content: changedContent } });
+    expect(second.statusCode).toBe(200);
+    const replay = await app.inject({ method: "PUT", url: `/api/v1/presentations/${id}/draft`, headers: { authorization }, payload: requestA });
+    expect(replay.statusCode).toBe(200); expect(replay.json().revision).toBe(2);
+
+    const checkpointBody = { baseVersionId: loaded.draft.baseVersionId, draftRevision: 3 };
+    const attempts = await Promise.all([randomUUID(), randomUUID()].map(clientMutationId => app.inject({ method: "POST", url: `/api/v1/presentations/${id}/checkpoints`, headers: { authorization }, payload: { ...checkpointBody, clientMutationId } })));
+    expect(attempts.map(result => result.statusCode).sort()).toEqual([201, 409]);
+  });
+
+  it("impede referências de autoria entre organizações no banco", async () => {
+    const { app, database } = await setup(); const authorization = await bootstrapAndLogin(app);
+    const me = (await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization } })).json();
+    const otherOrganizationId = randomUUID();
+    await database.query("INSERT INTO organizations(id,name,slug) VALUES($1,'Organização isolada','isolada')", [otherOrganizationId]);
+    await expect(database.query("INSERT INTO presentations(id,organization_id,title,created_by) VALUES($1,$2,'Inválida',$3)", [randomUUID(), otherOrganizationId, me.user.id])).rejects.toBeTruthy();
+  });
+});
+
+describe("gestão de membros", () => {
+  it("cria acesso temporário, exige troca de senha e aplica permissão de owner", async () => {
+    const { app } = await setup();
+    const ownerAuthorization = await bootstrapAndLogin(app);
+    const created = await app.inject({ method: "POST", url: "/api/v1/members", headers: { authorization: ownerAuthorization }, payload: { name: "Pessoa editora", email: "editor@jump.local", role: "editor", temporaryPassword: "temporaria-123" } });
+    expect(created.statusCode).toBe(201);
+    expect(created.json().mustChangePassword).toBe(true);
+
+    const login = await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { email: "editor@jump.local", password: "temporaria-123" } });
+    const editorAuthorization = `Bearer ${login.json().token as string}`;
+    expect(login.json().user.mustChangePassword).toBe(true);
+    const temporaryMe = await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: editorAuthorization } });
+    expect(temporaryMe.statusCode).toBe(200);
+    const blockedUntilPasswordChange = await app.inject({ method: "GET", url: "/api/v1/presentations", headers: { authorization: editorAuthorization } });
+    expect(blockedUntilPasswordChange.statusCode).toBe(403);
+    expect(blockedUntilPasswordChange.json().error.code).toBe("PASSWORD_CHANGE_REQUIRED");
+    expect((await app.inject({ method: "GET", url: "/api/v1/members", headers: { authorization: editorAuthorization } })).statusCode).toBe(403);
+
+    const change = await app.inject({ method: "POST", url: "/api/v1/auth/change-password", headers: { authorization: editorAuthorization }, payload: { currentPassword: "temporaria-123", newPassword: "nova-segura-456" } });
+    expect(change.statusCode).toBe(200);
+    const me = await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: editorAuthorization } });
+    expect(me.json().user.mustChangePassword).toBe(false);
+  });
+
+  it("não permite desativar o último proprietário", async () => {
+    const { app } = await setup();
+    const ownerAuthorization = await bootstrapAndLogin(app);
+    const me = await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: ownerAuthorization } });
+    const response = await app.inject({ method: "PATCH", url: `/api/v1/members/${me.json().user.id as string}`, headers: { authorization: ownerAuthorization }, payload: { status: "disabled" } });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe("CANNOT_DISABLE_SELF");
+  });
+
+  it("limita tentativas repetidas de login com erro padronizado", async () => {
+    const { app } = await setup();
+    for (let attempt = 0; attempt < 8; attempt++) await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { email: "inexistente@jump.local", password: "senha-incorreta" } });
+    const limited = await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { email: "inexistente@jump.local", password: "senha-incorreta" } });
+    expect(limited.statusCode).toBe(429);
+    expect(limited.json().error.code).toBe("RATE_LIMITED");
+    expect(limited.json().error.requestId).toBeTruthy();
+  });
+});
+
+describe("biblioteca Jump", () => {
+  it("versiona, aprova e entrega para a IA somente conteudo aprovado e valido", async () => {
+    const { app } = await setup();
+    const authorization = await bootstrapAndLogin(app);
+    const payload = {
+      kind: "service", title: "Modernizacao de plataformas",
+      text: "A Jump apoia jornadas de modernizacao com times especializados.",
+      sourceLabel: "Apresentacao institucional aprovada", sourceUrl: "https://jump.tec.br/sobre-nos/",
+      sourceLocator: "Slide 4", validFrom: "2020-01-01", validUntil: "2099-12-31",
+      tags: ["modernizacao", "servicos"]
+    };
+    const created = await app.inject({ method: "POST", url: "/api/v1/jump-contents", headers: { authorization }, payload });
+    expect(created.statusCode).toBe(201);
+    const id = created.json().id as string;
+    expect((await app.inject({ method: "GET", url: "/api/v1/jump-context", headers: { authorization } })).json().items).toHaveLength(0);
+
+    expect((await app.inject({ method: "POST", url: `/api/v1/jump-contents/${id}/submit`, headers: { authorization }, payload: {} })).statusCode).toBe(200);
+    const approved = await app.inject({ method: "POST", url: `/api/v1/jump-contents/${id}/approve`, headers: { authorization }, payload: { note: "Fonte conferida." } });
+    expect(approved.statusCode).toBe(200);
+    expect(approved.json().status).toBe("approved");
+    const context = await app.inject({ method: "GET", url: "/api/v1/jump-context?q=modernizacao", headers: { authorization } });
+    expect(context.json().items).toHaveLength(1);
+    expect(context.json().items[0].sourceLabel).toBe(payload.sourceLabel);
+
+    const changed = await app.inject({ method: "PUT", url: `/api/v1/jump-contents/${id}`, headers: { authorization }, payload: { ...payload, text: `${payload.text} Conteudo revisado.` } });
+    expect(changed.statusCode).toBe(200);
+    expect(changed.json().status).toBe("draft");
+    expect(changed.json().versionNumber).toBe(2);
+    expect((await app.inject({ method: "GET", url: "/api/v1/jump-context", headers: { authorization } })).json().items).toHaveLength(0);
+    const detail = await app.inject({ method: "GET", url: `/api/v1/jump-contents/${id}`, headers: { authorization } });
+    expect(detail.json().versions).toHaveLength(2);
+    expect(detail.json().reviews.map((review: { action: string }) => review.action)).toEqual(expect.arrayContaining(["submitted", "approved"]));
+  });
+
+  it("bloqueia gestao por editor e exclui conteudo vencido do contexto da IA", async () => {
+    const { app, database } = await setup();
+    const ownerAuthorization = await bootstrapAndLogin(app);
+    const me = (await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: ownerAuthorization } })).json();
+    await database.query("INSERT INTO users(id,organization_id,name,email,password_hash,role) VALUES($1,$2,'Editor','editor-jump@jump.local',$3,'editor')", [randomUUID(), me.organization.id, await hashPassword("senha-editor-123")]);
+    const editorLogin = await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { email: "editor-jump@jump.local", password: "senha-editor-123" } });
+    const editorAuthorization = `Bearer ${editorLogin.json().token as string}`;
+    const payload = { kind: "metric", title: "Indicador vencido", text: "100 projetos.", sourceLabel: "Relatorio antigo", validFrom: "2020-01-01", validUntil: "2020-12-31", tags: ["indicador"] };
+    expect((await app.inject({ method: "POST", url: "/api/v1/jump-contents", headers: { authorization: editorAuthorization }, payload })).statusCode).toBe(403);
+    expect((await app.inject({ method: "GET", url: "/api/v1/jump-contents", headers: { authorization: editorAuthorization } })).statusCode).toBe(403);
+    const created = await app.inject({ method: "POST", url: "/api/v1/jump-contents", headers: { authorization: ownerAuthorization }, payload });
+    const id = created.json().id as string;
+    await app.inject({ method: "POST", url: `/api/v1/jump-contents/${id}/submit`, headers: { authorization: ownerAuthorization }, payload: {} });
+    await app.inject({ method: "POST", url: `/api/v1/jump-contents/${id}/approve`, headers: { authorization: ownerAuthorization }, payload: {} });
+    const list = await app.inject({ method: "GET", url: "/api/v1/jump-contents", headers: { authorization: ownerAuthorization } });
+    expect(list.json().items[0].effectiveStatus).toBe("expired");
+    expect((await app.inject({ method: "GET", url: "/api/v1/jump-context", headers: { authorization: ownerAuthorization } })).json().items).toHaveLength(0);
+  });
+});
