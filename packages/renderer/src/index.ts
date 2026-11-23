@@ -13,15 +13,15 @@ export function renderSlideHtml(slide: Slide, index = 0): string {
 }
 
 export const presentationStyles = `
-.slide{position:relative;overflow:hidden;aspect-ratio:16/9;width:min(100%,1280px);margin:auto;background:var(--paper);padding:7%;display:flex;flex-direction:column;justify-content:center;box-shadow:0 10px 30px #0002}
-.text{max-width:88%;white-space:pre-wrap;overflow-wrap:anywhere}.role-title{font-size:clamp(32px,5vw,72px);line-height:.95;font-weight:750;letter-spacing:-.06em}.role-subtitle,.role-body,.role-caption,.role-cta{font-size:clamp(16px,2vw,30px);line-height:1.35;margin-top:24px;color:var(--muted)}
+.slide{container-type:inline-size;position:relative;overflow:hidden;aspect-ratio:16/9;width:min(100%,1280px);margin:auto;background:var(--paper);padding:clamp(18px,6cqw,86px);display:flex;flex-direction:column;justify-content:center;gap:clamp(6px,1.35cqw,20px);box-shadow:0 10px 30px #0002}
+.text{max-width:88%;white-space:pre-wrap;overflow-wrap:anywhere}.role-title{font-size:clamp(20px,4.4cqw,64px);line-height:1;font-weight:750;letter-spacing:-.045em}.role-subtitle,.role-body,.role-caption,.role-cta{font-size:clamp(11px,1.65cqw,24px);line-height:1.3;margin-top:0;color:var(--muted)}
 .layout-cover{background:var(--ink);color:#fff}.layout-cover .role-subtitle{color:var(--accent)}
-.layout-text_image{display:grid;grid-template-columns:1.05fr .95fr;grid-auto-rows:min-content;align-content:center;gap:18px 6%}.layout-text_image .image{grid-column:2;grid-row:1/span 8;height:100%;min-height:60%}.layout-text_image .text{grid-column:1}
-.layout-two_columns{display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:row;align-content:center;gap:24px 7%}.layout-two_columns .role-title{grid-column:1/-1}.layout-two_columns .role-body{max-width:100%;margin-top:0;border-top:2px solid currentColor;padding-top:16px}
-.layout-metrics{display:grid;grid-template-columns:repeat(2,1fr);align-content:center;gap:20px}.layout-metrics .role-title{grid-column:1/-1}.layout-metrics .metric{margin:0}
-.layout-case{justify-content:flex-start}.layout-case .role-title{padding-bottom:24px;border-bottom:4px solid var(--accent)}.layout-case .role-body{max-width:72%}
+.layout-text_image{display:grid;grid-template-columns:1.05fr .95fr;grid-auto-rows:min-content;align-content:center;gap:clamp(6px,1.4cqw,18px) 6%}.layout-text_image .image{grid-column:2;grid-row:1/span 8;height:100%;min-height:60%}.layout-text_image .text{grid-column:1}
+.layout-two_columns{display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:row;align-content:center;gap:clamp(8px,1.8cqw,24px) 7%}.layout-two_columns .role-title{grid-column:1/-1}.layout-two_columns .role-body{max-width:100%;margin-top:0;border-top:2px solid currentColor;padding-top:clamp(6px,1.2cqw,16px)}
+.layout-metrics{display:grid;grid-template-columns:repeat(2,1fr);align-content:center;gap:clamp(7px,1.6cqw,20px)}.layout-metrics .role-title{grid-column:1/-1}.layout-metrics .metric{margin:0}
+.layout-case{justify-content:flex-start}.layout-case .role-title{padding-bottom:clamp(8px,1.8cqw,24px);border-bottom:clamp(2px,.32cqw,4px) solid var(--accent)}.layout-case .role-body{max-width:72%}
 .layout-closing{background:var(--accent);align-items:center;text-align:center}.layout-closing .text{max-width:76%}.layout-closing .role-cta{color:var(--ink);border:2px solid var(--ink);padding:12px 18px}
-.metric{border-top:3px solid currentColor;padding-top:14px;display:inline-grid;min-width:180px;margin:10px}.metric strong{font-size:48px}.metric small{font-size:20px;margin-left:4px}.metric span{color:var(--muted)}.image{min-height:35%;border:2px dashed #aaa;display:grid;place-items:center;color:var(--muted)}
+.metric{border-top:clamp(1px,.24cqw,3px) solid currentColor;padding-top:clamp(5px,1.1cqw,14px);display:inline-grid;min-width:0;margin:clamp(3px,.8cqw,10px)}.metric strong{font-size:clamp(18px,3.75cqw,48px)}.metric small{font-size:clamp(9px,1.55cqw,20px);margin-left:4px}.metric span{font-size:clamp(10px,1.25cqw,16px);color:var(--muted)}.image{min-height:35%;border:2px dashed #aaa;display:grid;place-items:center;color:var(--muted)}
 `;
 
 export function renderPresentationDocument(content: PresentationContent, title = "Deck AI"): string {
