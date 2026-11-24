@@ -57,6 +57,18 @@ O protótipo funcional fica em:
 http://localhost:5173/prototipo.html
 ```
 
+## Prova visual do editor (Dev 2)
+
+Na raiz do repositório, gere novamente a página autônoma após alterar a prova:
+
+```powershell
+py -3 proof/build.py
+```
+
+O build também atualiza `preview-dev3/editor-dev2.html`. Com o servidor da seção anterior, abra `http://localhost:5173/editor-dev2.html` ou use o link na visão geral e no protótipo. A prova mostra seis layouts 16:9, edição local de textos e métricas, miniaturas, apresentação, exportação HTML e impressão. O arquivo `proof/dist/deck.html` pode ser aberto offline.
+
+Esta é uma demonstração independente com conteúdo sintético e contrato JSON provisório. Ela ainda não lê apresentações da API ou do armazenamento local do Dev 3, nem gera PDF ou PPTX. Consulte [a documentação da prova](proof/README.md) para testar e conhecer os limites.
+
 ## O que testar no protótipo
 
 1. Criar uma apresentação.
@@ -77,6 +89,9 @@ platform/mock-data/      dados de demonstração
 platform/validation/     validações locais
 platform/api/            API persistente de desenvolvimento
 preview-dev3/            prévia visual e protótipo funcional
+proof/                   fonte e build da prova visual do Dev 2
+examples/                apresentação sintética da prova
+assets/                  imagens neutras da prova
 ```
 
 ## Próxima etapa recomendada

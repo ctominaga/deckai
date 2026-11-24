@@ -1,0 +1,123 @@
+{
+  "schemaVersion": "0.1.0-draft",
+  "id": "presentation-technical-fixture-001",
+  "documentRevision": 0,
+  "title": "Apresentação de demonstração neutra",
+  "locale": "pt-BR",
+  "theme": {
+    "name": "Neutro para prova técnica",
+    "aspectRatio": "16:9",
+    "colors": {
+      "background": "#F7F8FA",
+      "surface": "#FFFFFF",
+      "ink": "#182638",
+      "accent": "#176B89",
+      "muted": "#526477"
+    },
+    "typography": {
+      "headingFontFamily": "Arial, Helvetica, sans-serif",
+      "bodyFontFamily": "Arial, Helvetica, sans-serif"
+    }
+  },
+  "assets": [
+    {
+      "id": "asset-neutral-hero",
+      "kind": "image",
+      "mimeType": "image/svg+xml",
+      "path": "assets/neutral-hero.svg",
+      "provenance": { "status": "placeholder" }
+    },
+    {
+      "id": "asset-neutral-workflow",
+      "kind": "image",
+      "mimeType": "image/svg+xml",
+      "path": "assets/neutral-workflow.svg",
+      "provenance": { "status": "placeholder" }
+    },
+    {
+      "id": "asset-neutral-case",
+      "kind": "image",
+      "mimeType": "image/svg+xml",
+      "path": "assets/neutral-case.svg",
+      "provenance": { "status": "placeholder" }
+    },
+    {
+      "id": "asset-neutral-closing",
+      "kind": "image",
+      "mimeType": "image/svg+xml",
+      "path": "assets/neutral-closing.svg",
+      "provenance": { "status": "placeholder" }
+    }
+  ],
+  "slides": [
+    {
+      "id": "slide-cover-001",
+      "layout": "cover",
+      "blocks": [
+        { "id": "block-cover-title-001", "slot": "title", "kind": "text", "value": { "text": "Ideias em apresentação" } },
+        { "id": "block-cover-subtitle-001", "slot": "subtitle", "kind": "text", "value": { "text": "Exemplo técnico para testar o editor e as exportações" } },
+        { "id": "block-cover-image-001", "slot": "image", "kind": "image", "value": { "assetId": "asset-neutral-hero", "alt": "Composição abstrata de formas geométricas azuis" } }
+      ]
+    },
+    {
+      "id": "slide-text-image-001",
+      "layout": "textImage",
+      "blocks": [
+        { "id": "block-text-image-title-001", "slot": "title", "kind": "text", "value": { "text": "Uma mensagem por slide" } },
+        { "id": "block-text-image-body-001", "slot": "body", "kind": "text", "value": { "text": "Este texto fictício demonstra a leitura de um parágrafo ao lado de uma imagem. Ele pode ser editado sem alterar outros slides." } },
+        { "id": "block-text-image-image-001", "slot": "image", "kind": "image", "value": { "assetId": "asset-neutral-workflow", "alt": "Três cartões abstratos conectados em sequência" } }
+      ]
+    },
+    {
+      "id": "slide-two-columns-001",
+      "layout": "twoColumns",
+      "blocks": [
+        { "id": "block-two-columns-title-001", "slot": "title", "kind": "text", "value": { "text": "Duas perspectivas" } },
+        { "id": "block-two-columns-left-heading-001", "slot": "leftHeading", "kind": "text", "value": { "text": "Ponto de partida" } },
+        { "id": "block-two-columns-left-body-001", "slot": "leftBody", "kind": "text", "value": { "text": "Descreva o contexto em frases curtas. Os dados exibidos aqui são apenas material de preenchimento." } },
+        { "id": "block-two-columns-right-heading-001", "slot": "rightHeading", "kind": "text", "value": { "text": "Próximo passo" } },
+        { "id": "block-two-columns-right-body-001", "slot": "rightBody", "kind": "text", "value": { "text": "Apresente a ação sugerida com linguagem direta. Esta coluna também é editável de forma independente." } }
+      ]
+    },
+    {
+      "id": "slide-metrics-001",
+      "layout": "metrics",
+      "blocks": [
+        { "id": "block-metrics-title-001", "slot": "title", "kind": "text", "value": { "text": "Indicadores ilustrativos" } },
+        { "id": "block-metrics-subtitle-001", "slot": "subtitle", "kind": "text", "value": { "text": "Valores fictícios criados apenas para testar a composição." } },
+        { "id": "block-metrics-value-001", "slot": "metrics", "kind": "metric", "value": { "value": "01", "label": "etapa inicial" } },
+        { "id": "block-metrics-value-002", "slot": "metrics", "kind": "metric", "value": { "value": "02", "label": "etapa intermediária" } },
+        { "id": "block-metrics-value-003", "slot": "metrics", "kind": "metric", "value": { "value": "03", "label": "etapa final" } }
+      ]
+    },
+    {
+      "id": "slide-case-001",
+      "layout": "case",
+      "blocks": [
+        { "id": "block-case-title-001", "slot": "title", "kind": "text", "value": { "text": "Caso hipotético" } },
+        { "id": "block-case-challenge-001", "slot": "challenge", "kind": "text", "value": { "text": "Organizar informações dispersas em uma narrativa clara." } },
+        { "id": "block-case-solution-001", "slot": "solution", "kind": "text", "value": { "text": "Dividir o conteúdo em etapas visuais e revisar cada mensagem." } },
+        { "id": "block-case-outcome-001", "slot": "outcome", "kind": "text", "value": { "text": "Uma apresentação simples para discussão interna." } },
+        { "id": "block-case-image-001", "slot": "image", "kind": "image", "value": { "assetId": "asset-neutral-case", "alt": "Ilustração abstrata de cartões organizados em uma grade" } }
+      ]
+    },
+    {
+      "id": "slide-closing-001",
+      "layout": "closing",
+      "blocks": [
+        { "id": "block-closing-title-001", "slot": "title", "kind": "text", "value": { "text": "Vamos revisar juntos" } },
+        { "id": "block-closing-body-001", "slot": "body", "kind": "text", "value": { "text": "Fim da apresentação de exemplo. Substitua todo o conteúdo antes de qualquer uso externo." } },
+        { "id": "block-closing-image-001", "slot": "image", "kind": "image", "value": { "assetId": "asset-neutral-closing", "alt": "Arcos geométricos abstratos em tons de azul" } }
+      ]
+    }
+  ],
+  "metadata": {
+    "fixture": true,
+    "purpose": "technical-rendering-and-export-proof",
+    "contentProvenance": {
+      "sourceType": "synthetic-placeholder",
+      "approvalStatus": "not-approved",
+      "note": "Não é conteúdo institucional nem identidade visual aprovada da Jump."
+    }
+  }
+}

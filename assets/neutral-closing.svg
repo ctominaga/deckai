@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-labelledby="title">
+  <title id="title">Arcos geométricos abstratos em tons de azul</title>
+  <rect width="800" height="600" rx="48" fill="#EAF4F7"/>
+  <circle cx="400" cy="300" r="226" fill="#D4E8EE"/>
+  <path d="M400 74a226 226 0 0 1 226 226H507a107 107 0 0 0-107-107Z" fill="#176B89"/>
+  <path d="M626 300a226 226 0 0 1-226 226V407a107 107 0 0 0 107-107Z" fill="#4F9DB2"/>
+  <path d="M400 526a226 226 0 0 1-226-226h119a107 107 0 0 0 107 107Z" fill="#8FC2CE"/>
+  <path d="M174 300A226 226 0 0 1 400 74v119a107 107 0 0 0-107 107Z" fill="#B1D5DE"/>
+  <circle cx="400" cy="300" r="61" fill="#FFFFFF"/>
+</svg>
