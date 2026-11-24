@@ -8,7 +8,7 @@ describe("renderer HTML", () => {
     expect(html).toContain("&lt;script&gt;");
     expect(html).toContain("aspect-ratio:16/9");
     expect(html).toContain("container-type:inline-size");
-    expect(html).toContain("4.4cqw");
+    expect(html).toContain("4.9cqw");
     expect(html).not.toContain("5vw");
   });
 });

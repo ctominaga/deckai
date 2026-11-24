@@ -3,6 +3,7 @@ import { presentationStyles, renderPresentationDocument, renderSlideHtml } from 
 import { api, ApiClientError, session } from "./api.js";
 import "./styles.css";
 import "./members.css";
+import "./editor-polish.css";
 
 type Me = { user: { id:string; organizationId:string; name:string; email:string; role:string; mustChangePassword:boolean }; organization: { id:string; name:string; slug:string } };
 type Presentation = { id:string; title:string; currentVersionId:string; updatedAt:string };
