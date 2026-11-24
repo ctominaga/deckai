@@ -231,7 +231,7 @@ describe("biblioteca Jump", () => {
 
 describe("geracao de roteiro por IA", () => {
   it("usa somente contexto Jump aprovado, persiste o roteiro e respeita idempotencia", async () => {
-    let calls = 0; let presentationCalls = 0; let receivedContext: Array<{ id: string }> = [];
+    let calls = 0; let presentationCalls = 0; let regenerationCalls = 0; let receivedContext: Array<{ id: string }> = [];
     const provider: OutlineProvider = { name: "deepseek", model: "deepseek-test", async generateOutline(briefing, context) {
       calls++; receivedContext = context;
       return { title: briefing.objective, slides: Array.from({ length: briefing.slideCount }, (_, index) => ({
@@ -244,6 +244,12 @@ describe("geracao de roteiro por IA", () => {
         { type: "text" as const, role: "title" as const, text: slide.title },
         { type: "text" as const, role: "body" as const, text: "Conteúdo desenvolvido com fonte aprovada." }
       ] })), usage: { total_tokens: 456 } };
+    }, async regenerateSlide(slide, _instruction, context) {
+      regenerationCalls++; const title = slide.blocks.find(block => block.type === "text" && block.role === "title");
+      return { blocks: [
+        { type: "text" as const, role: "title" as const, text: title?.type === "text" ? title.text : "Slide" },
+        { type: "text" as const, role: "body" as const, text: "Conteúdo regenerado somente neste slide." }
+      ], referenceIds: context[0] ? [context[0].id] : [], usage: { total_tokens: 78 } };
     } };
     const { app } = await setup(provider); const authorization = await bootstrapAndLogin(app);
     const jumpPayload = { kind: "service", title: "Serviço aprovado", text: "Conteúdo institucional aprovado.", sourceLabel: "Fonte interna", validFrom: "2020-01-01", validUntil: "2099-12-31", tags: ["serviço"] };
@@ -269,6 +275,20 @@ describe("geracao de roteiro por IA", () => {
     const editor = await app.inject({ method: "GET", url: `/api/v1/presentations/${presentationId}`, headers: { authorization } });
     expect(editor.statusCode).toBe(200); expect(editor.json().draft.content.slides).toHaveLength(2);
     expect(editor.json().draft.content.slides[0].references).toEqual([jumpId]);
+    const untouchedSlide = structuredClone(editor.json().draft.content.slides[1]); const firstSlideId = editor.json().draft.content.slides[0].slideId as string; const regenerationKey = randomUUID();
+    const regenerationPath = `/api/v1/presentations/${presentationId}/slides/${firstSlideId}/regenerate`;
+    const regenerationPayload = { idempotencyKey: regenerationKey, baseVersionId: editor.json().draft.baseVersionId, expectedRevision: 1, instruction: "Deixe o texto mais direto" };
+    const regenerated = await app.inject({ method: "POST", url: regenerationPath, headers: { authorization }, payload: regenerationPayload });
+    expect(regenerated.statusCode).toBe(200); expect(regenerated.json().draft.revision).toBe(2);
+    expect(regenerated.json().draft.content.slides[0].blocks[1].text).toContain("regenerado");
+    expect(regenerated.json().draft.content.slides[1]).toEqual(untouchedSlide);
+    const regenerationReplay = await app.inject({ method: "POST", url: regenerationPath, headers: { authorization }, payload: regenerationPayload });
+    expect(regenerationReplay.statusCode).toBe(200); expect(regenerationReplay.json().draft.revision).toBe(2); expect(regenerationCalls).toBe(1);
+    const differentInput = await app.inject({ method: "POST", url: regenerationPath, headers: { authorization }, payload: { ...regenerationPayload, instruction: "Outra instrução" } });
+    expect(differentInput.json().error.code).toBe("AI_IDEMPOTENCY_CONFLICT");
+    const outdated = await app.inject({ method: "POST", url: regenerationPath, headers: { authorization }, payload: { ...regenerationPayload, idempotencyKey: randomUUID(), baseVersionId: randomUUID(), expectedRevision: 2 } });
+    expect(outdated.json().error.code).toBe("AUTOSAVE_CONFLICT");
+    expect(regenerationCalls).toBe(1);
     const presentationReplay = await app.inject({ method: "POST", url: `/api/v1/ai/outlines/${generated.json().outline.id as string}/presentation`, headers: { authorization }, payload: { idempotencyKey: presentationKey, provider: "deepseek" } });
     expect(presentationReplay.statusCode).toBe(200); expect(presentationReplay.json().presentation.id).toBe(presentationId); expect(presentationCalls).toBe(1);
     const listed = await app.inject({ method: "GET", url: "/api/v1/ai/outlines", headers: { authorization } });

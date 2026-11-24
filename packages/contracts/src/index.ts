@@ -136,6 +136,12 @@ export const GeneratePresentationFromOutlineSchema = z.object({
   idempotencyKey: IdSchema,
   provider: z.literal("deepseek").default("deepseek")
 }).strict();
+export const RegenerateSlideSchema = z.object({
+  idempotencyKey: IdSchema,
+  baseVersionId: IdSchema,
+  expectedRevision: z.number().int().positive(),
+  instruction: z.string().trim().min(1).max(2_000)
+}).strict();
 export const CreatePresentationSchema = z.object({ title: z.string().trim().min(1).max(180) });
 export const UpdatePresentationSchema = z.object({ title: z.string().trim().min(1).max(180) }).strict();
 export const SaveDraftSchema = z.object({

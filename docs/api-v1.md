@@ -221,4 +221,8 @@ Aprova um roteiro em rascunho usando controle otimista por `expectedRevision`. A
 
 Desenvolve os slides de um roteiro aprovado, valida quantidade, ordem, layouts, títulos e referências e persiste uma apresentação canônica com versão inicial e rascunho editável. A solicitação exige uma nova `idempotencyKey`; repeti-la retorna a mesma apresentação sem nova chamada ao provedor.
 
+### `POST /api/v1/presentations/:id/slides/:slideId/regenerate`
+
+Owners e editores podem refazer o conteúdo de um slide do rascunho. Envie `idempotencyKey`, `baseVersionId`, `expectedRevision` e `instruction`. A operação mantém o layout, o título existente, as imagens e os demais slides. O retorno inclui `job`, `draft` atualizado e `regeneratedSlideId`. Se outra alteração mudar o rascunho durante a chamada, a API retorna `409 AUTOSAVE_CONFLICT`.
+
 Para habilitar chamadas reais, crie `.env.local` fora do Git com `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` e `DECKAI_ENABLE_REAL_DEEPSEEK=true`. Sem isso, o endpoint retorna erro controlado e não simula sucesso.

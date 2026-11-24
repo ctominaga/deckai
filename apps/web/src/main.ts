@@ -120,10 +120,83 @@ function renderEditor(){if(!active)return;const content=active.draft.content;con
   document.querySelector("#addMetric")?.addEventListener("click",()=>{slide.blocks.push({id:crypto.randomUUID(),type:"metric",role:"metric",value:"100",label:"Novo indicador"});changed()});
   document.querySelector<HTMLInputElement>("#presentationTitle")?.addEventListener("change",renamePresentation);
   document.querySelectorAll<HTMLButtonElement>("[data-slide-action]").forEach(button=>button.addEventListener("click",()=>slideAction(button.dataset.slideAction!)));
+  if (editable) {
+    const regenerate = document.createElement("button");
+    regenerate.type = "button";
+    regenerate.className = "button secondary";
+    regenerate.textContent = "Refazer slide com IA";
+    regenerate.addEventListener("click", () => showRegeneration(slide.slideId));
+    root.querySelector(".slide-actions")?.append(regenerate);
+  }
   document.querySelector<HTMLSelectElement>("#layout")?.addEventListener("change",event=>{slide.layout=(event.target as HTMLSelectElement).value as Slide["layout"];changed()});
   document.querySelectorAll<HTMLButtonElement>(".slide-item").forEach(button=>button.addEventListener("click",()=>{selectedSlide=Number(button.dataset.index);renderEditor()}));
   document.querySelectorAll<HTMLInputElement|HTMLTextAreaElement>("[data-block]").forEach(input=>input.addEventListener("input",event=>{const target=event.target as HTMLInputElement|HTMLTextAreaElement;const block=slide.blocks[Number(target.dataset.block)];if(!block)return;if(block.type==="text"&&target.dataset.field==="text")block.text=target.value;if(block.type==="metric"){if(target.dataset.field==="value")block.value=target.value;if(target.dataset.field==="label")block.label=target.value}changed(false)}));
   document.querySelectorAll<HTMLButtonElement>("[data-delete-block]").forEach(button=>button.addEventListener("click",()=>{slide.blocks.splice(Number(button.dataset.deleteBlock),1);changed()}));
+}
+
+function showRegeneration(slideId: string) {
+  const editor = active;
+  if (!editor) return;
+  const dialog = document.createElement("dialog");
+  dialog.className = "dialog ai-dialog";
+  dialog.innerHTML = `<form>
+    <h2>Refazer este slide com IA</h2>
+    <p class="muted">A alteração será salva no rascunho atual.</p>
+    <div class="field"><label for="regenerateInstruction">O que você quer mudar?</label>
+    <textarea id="regenerateInstruction" name="instruction" maxlength="2000" required rows="4" placeholder="Ex.: Resuma em três pontos."></textarea></div>
+    <div role="status" id="regenerationStatus"></div>
+    <div class="dialog-actions"><button type="button" class="button secondary" id="cancelRegeneration">Cancelar</button>
+    <button class="button" type="submit">Refazer slide</button></div>
+  </form>`;
+  const form = dialog.querySelector("form")!;
+  const status = dialog.querySelector<HTMLElement>("#regenerationStatus")!;
+  const cancel = dialog.querySelector<HTMLButtonElement>("#cancelRegeneration")!;
+  const submit = dialog.querySelector<HTMLButtonElement>('[type="submit"]')!;
+  let running = false;
+  let previousAttempt: { fingerprint: string; key: string } | undefined;
+  dialog.addEventListener("cancel", event => { if (running) event.preventDefault(); });
+  dialog.addEventListener("close", () => dialog.remove());
+  cancel.addEventListener("click", () => dialog.close());
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    if (running) return;
+    const instruction = String(new FormData(form).get("instruction") ?? "").trim();
+    if (!instruction) {
+      status.textContent = "Informe o que você quer mudar.";
+      return;
+    }
+    running = cancel.disabled = submit.disabled = true;
+    status.textContent = "Salvando edições e preparando o slide…";
+    try {
+      await autosave();
+      if (hasPendingChanges && active === editor) await autosave();
+      if (active !== editor || hasPendingChanges) throw new Error("Salve as alterações do editor antes de refazer o slide.");
+      const { baseVersionId, revision } = editor.draft;
+      const fingerprint = JSON.stringify([baseVersionId, revision, instruction]);
+      if (previousAttempt?.fingerprint !== fingerprint) previousAttempt = { fingerprint, key: crypto.randomUUID() };
+      status.textContent = "A IA está refazendo o slide…";
+      const result = await api<{ draft: Draft }>(`/api/v1/presentations/${editor.presentation.id}/slides/${slideId}/regenerate`, {
+        method: "POST",
+        body: { idempotencyKey: previousAttempt.key, baseVersionId, expectedRevision: revision, instruction }
+      });
+      if (active === editor && !hasPendingChanges && editor.draft.baseVersionId === baseVersionId && editor.draft.revision === revision) {
+        editor.draft = result.draft;
+        saveLabel = "Salvo";
+        saveClass = "status-ok";
+        renderEditor();
+        toast("Slide atualizado e salvo.");
+      }
+      dialog.close();
+    } catch (reason) {
+      if (reason instanceof ApiClientError && reason.code !== "AI_IDEMPOTENCY_CONFLICT") previousAttempt = undefined;
+      if (reason instanceof ApiClientError && reason.code === "AI_IDEMPOTENCY_CONFLICT" && (reason.details as { status?: string } | undefined)?.status === "failed") previousAttempt = undefined;
+      status.textContent = errorMessage(reason);
+    } finally {
+      running = cancel.disabled = submit.disabled = false;
+    }
+  });
+  document.body.append(dialog);
+  dialog.showModal();
 }
 
 function titleOf(slide:Slide){const block=slide.blocks.find(item=>item.type==="text"&&item.role==="title");return block?.type==="text"?block.text:slide.layout}
