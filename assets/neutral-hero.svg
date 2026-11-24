@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-labelledby="title">
+  <title id="title">Composição abstrata de formas geométricas azuis</title>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1">
+      <stop offset="0" stop-color="#EAF4F7"/>
+      <stop offset="1" stop-color="#D8E8EE"/>
+    </linearGradient>
+    <linearGradient id="orb" x2="1" y2="1">
+      <stop offset="0" stop-color="#2A809B"/>
+      <stop offset="1" stop-color="#145C7A"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" rx="48" fill="url(#bg)"/>
+  <circle cx="403" cy="294" r="180" fill="url(#orb)"/>
+  <circle cx="403" cy="294" r="119" fill="#F7F8FA"/>
+  <path d="M403 114a180 180 0 0 1 180 180H463a60 60 0 0 0-60-60Z" fill="#79B7C7"/>
+  <rect x="96" y="394" width="226" height="86" rx="28" fill="#FFFFFF" opacity=".94"/>
+  <rect x="126" y="424" width="122" height="12" rx="6" fill="#8EBCC9"/>
+  <rect x="126" y="446" width="78" height="8" rx="4" fill="#CADDE3"/>
+  <rect x="522" y="92" width="183" height="124" rx="30" fill="#FFFFFF" opacity=".88"/>
+  <circle cx="568" cy="151" r="22" fill="#B1D2DA"/>
+  <rect x="607" y="135" width="67" height="10" rx="5" fill="#7AAFC0"/>
+  <rect x="607" y="154" width="45" height="8" rx="4" fill="#CADDE3"/>
+</svg>

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Prova técnica offline do editor HTML do Deck AI com conteúdo neutro provisório.">
+  <title>Deck AI · prova HTML offline</title>
+  <style>/*__DECK_CSS__*/</style>
+</head>
+<body>
+  <a class="skip-link" href="#stage">Ir para o slide</a>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand" aria-label="Deck AI, prova técnica">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span>Deck <strong>AI</strong></span>
+      </div>
+      <div class="deck-heading">
+        <div id="deck-title" class="deck-title"></div>
+        <div class="demo-label">PROVA TÉCNICA · CONTEÚDO NEUTRO PROVISÓRIO</div>
+      </div>
+      <div class="top-actions">
+        <button id="download-html" class="button button-secondary" type="button" title="Baixar um HTML autônomo com as edições locais">Exportar HTML</button>
+        <button id="present" class="button button-primary" type="button">Apresentar <span aria-hidden="true">↗</span></button>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside class="sidebar" aria-label="Miniaturas dos slides">
+        <div class="side-heading"><h2>Slides</h2><span id="slide-count" class="count"></span></div>
+        <nav id="slide-list" class="slide-list" aria-label="Selecionar slide"></nav>
+        <div class="side-note"><span class="note-dot" aria-hidden="true"></span>Exemplo local. Sem integração com API ou salvamento.</div>
+      </aside>
+
+      <main id="stage" class="editor" tabindex="-1">
+        <div class="editor-topline">
+          <div>
+            <div class="eyebrow">PRÉVIA DO EDITOR</div>
+            <h1 id="stage-heading">Slide <span id="slide-number"></span><span class="heading-divider">/</span><span id="slide-total"></span></h1>
+          </div>
+          <div id="layout-label" class="layout-pill"></div>
+        </div>
+        <div id="slide-stage" class="slide-stage" aria-label="Slide selecionado"></div>
+        <div class="editor-footer">
+          <p id="edit-status" role="status" aria-live="polite" tabindex="-1">Clique em um texto do slide para editá-lo. As alterações ficam apenas nesta aba.</p>
+          <div class="slide-controls">
+            <button id="previous" class="icon-button" type="button" aria-label="Slide anterior" title="Slide anterior">←</button>
+            <span id="slide-position" aria-live="polite"></span>
+            <button id="next" class="icon-button" type="button" aria-label="Próximo slide" title="Próximo slide">→</button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div id="print-deck" aria-hidden="true"></div>
+  <div id="measure-stage" aria-hidden="true"></div>
+
+  <div id="presentation" class="presentation" role="dialog" aria-modal="true" aria-label="Modo de apresentação" hidden>
+    <div class="presentation-topbar">
+      <span class="presentation-brand">Deck AI <span>· demonstração</span></span>
+      <div class="presentation-actions">
+        <span id="presentation-position" aria-live="polite"></span>
+        <button id="close-presentation" class="presentation-close" type="button" aria-label="Sair da apresentação">Fechar <span aria-hidden="true">×</span></button>
+      </div>
+    </div>
+    <div class="presentation-center"><div id="presentation-stage" class="presentation-stage"></div></div>
+    <div class="presentation-bottom">
+      <span>← → para navegar · Esc para sair</span>
+      <div>
+        <button id="presentation-previous" type="button" aria-label="Slide anterior">←</button>
+        <button id="presentation-next" type="button" aria-label="Próximo slide">→</button>
+      </div>
+    </div>
+  </div>
+
+  <script id="deck-data" type="application/json">/*__DECK_DATA__*/</script>
+  <script>/*__DECK_JS__*/</script>
+</body>
+</html>

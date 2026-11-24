@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-labelledby="title">
+  <title id="title">Três cartões abstratos conectados em sequência</title>
+  <rect width="800" height="600" rx="48" fill="#EAF4F7"/>
+  <path d="M218 291h112m130 0h112" fill="none" stroke="#7AAFC0" stroke-width="14" stroke-linecap="round"/>
+  <path d="m314 274 21 17-21 17m241-34 21 17-21 17" fill="none" stroke="#7AAFC0" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="#FFFFFF" stroke="#BCD8E0" stroke-width="3">
+    <rect x="56" y="185" width="178" height="214" rx="26"/>
+    <rect x="311" y="150" width="178" height="284" rx="26"/>
+    <rect x="566" y="185" width="178" height="214" rx="26"/>
+  </g>
+  <circle cx="145" cy="258" r="31" fill="#B8D6DF"/>
+  <circle cx="400" cy="228" r="31" fill="#3B8DA6"/>
+  <circle cx="655" cy="258" r="31" fill="#B8D6DF"/>
+  <g fill="#CDDDE3">
+    <rect x="91" y="313" width="108" height="12" rx="6"/>
+    <rect x="91" y="337" width="78" height="9" rx="4.5"/>
+    <rect x="348" y="286" width="104" height="12" rx="6"/>
+    <rect x="348" y="310" width="72" height="9" rx="4.5"/>
+    <rect x="348" y="346" width="104" height="12" rx="6"/>
+    <rect x="348" y="370" width="84" height="9" rx="4.5"/>
+    <rect x="601" y="313" width="108" height="12" rx="6"/>
+    <rect x="601" y="337" width="78" height="9" rx="4.5"/>
+  </g>
+</svg>
