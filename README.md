@@ -2,7 +2,40 @@
 
 Protótipo e planejamento inicial do Deck AI, uma ferramenta para criar apresentações com IA usando conteúdo institucional rastreável.
 
-## Estado atual
+## Aplicação integrada — primeira vertical slice
+
+A nova base da aplicação está em `apps/` e `packages/`. Ela não usa os HTMLs de `preview-dev3` como aplicação oficial.
+
+Pré-requisitos: Node.js 24 ou versão LTS compatível e npm. Para desenvolvimento local não é necessário instalar PostgreSQL: PGlite executa o motor PostgreSQL em arquivo. Em homologação e produção, configure `DATABASE_URL` para um PostgreSQL externo.
+
+```powershell
+npm.cmd install
+npm.cmd run db:migrate
+npm.cmd run db:seed
+npm.cmd run dev
+```
+
+Abra `http://localhost:5173` e use o seed local:
+
+```text
+E-mail: dev@deckai.local
+Senha: DeckAI-dev-2026
+```
+
+O seed é exclusivo de desenvolvimento e recusa execução com `NODE_ENV=production`.
+
+Validação completa:
+
+```powershell
+npm.cmd test
+npm.cmd run test:legacy
+npm.cmd run typecheck
+npm.cmd run build
+```
+
+Detalhes da arquitetura e da entrega estão em `docs/vertical-slice-01.md`. Os contratos REST estão em `docs/api-v1.md`.
+
+## Base legada e protótipos
 
 O projeto está na fase de fundação local. Já existem:
 
