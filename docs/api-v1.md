@@ -225,4 +225,32 @@ Desenvolve os slides de um roteiro aprovado, valida quantidade, ordem, layouts, 
 
 Owners e editores podem refazer o conteúdo de um slide do rascunho. Envie `idempotencyKey`, `baseVersionId`, `expectedRevision` e `instruction`. A operação mantém o layout, o título existente, as imagens e os demais slides. O retorno inclui `job`, `draft` atualizado e `regeneratedSlideId`. Se outra alteração mudar o rascunho durante a chamada, a API retorna `409 AUTOSAVE_CONFLICT`.
 
+### `POST /api/v1/presentations/:id/slides/:slideId/blocks/:blockId/rewrite`
+
+Owners e editores podem reescrever um bloco de texto preenchido no rascunho. Salve edições locais antes de chamar a API e envie a base e a revisão retornadas pelo salvamento.
+
+```json
+{
+  "idempotencyKey": "<uuid gerado pelo cliente>",
+  "baseVersionId": "<uuid da versão base>",
+  "expectedRevision": 2,
+  "operation": "tone",
+  "tone": "Executivo e direto"
+}
+```
+
+Use `summarize` para resumir, `expand` para expandir e `tone` para ajustar o tom. Informe `tone` somente nessa última operação. O provedor recebe o texto do bloco e a operação. A API grava só o campo `text` e retorna `job`, `draft`, `rewrittenSlideId` e `rewrittenBlockId`. A interface deve aplicar o rascunho retornado apenas se ainda estiver na revisão que enviou. Use a mesma chave em caso de perda de resposta de uma solicitação idêntica. Em `409 AUTOSAVE_CONFLICT`, recarregue o rascunho antes de uma nova tentativa.
+
 Para habilitar chamadas reais, crie `.env.local` fora do Git com `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` e `DECKAI_ENABLE_REAL_DEEPSEEK=true`. Sem isso, o endpoint retorna erro controlado e não simula sucesso.
+
+## Pedidos de exportação PDF
+
+### `POST /api/v1/presentations/:id/exports/pdf`
+
+Owners e editores podem enfileirar o PDF de uma versão salva. Envie `versionId` e `idempotencyKey` como UUIDs. Para exportar alterações do rascunho, crie um checkpoint e use o ID da versão criada.
+
+A API responde com `202` e `{ job }` ao criar o pedido. Repetir a mesma solicitação com a mesma chave retorna o pedido existente com `200`. Reutilizar a chave para outra solicitação retorna `409 EXPORT_IDEMPOTENCY_CONFLICT`.
+
+### `GET /api/v1/exports/:id`
+
+Consulta `{ job }` pelo ID retornado na criação. A consulta exige autenticação e respeita a organização da sessão. Nesta etapa, o pedido permanece em `queued` até a integração do worker que gera o PDF.
