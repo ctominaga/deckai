@@ -1,4 +1,5 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildApp } from "./app.js";
 import { createMemoryDatabase, type Database } from "./database.js";
@@ -30,6 +31,14 @@ describe("primeira vertical slice", () => {
     expect(await runMigrations(database)).toEqual([]);
     const result = await database.query<{ version: string }>("SELECT version FROM schema_migrations");
     expect(result.rows.map((row) => row.version)).toContain("001_initial.sql");
+    const sql = await readFile("db/migrations/001_initial.sql", "utf8");
+    const windowsSql = sql.replace(/\r?\n/g, "\r\n");
+    const legacyChecksum = createHash("sha256").update(windowsSql).digest("hex");
+    await database.query("UPDATE schema_migrations SET checksum=$1 WHERE version='001_initial.sql'", [legacyChecksum]);
+    expect(await runMigrations(database)).toEqual([]);
+    const alteredChecksum = createHash("sha256").update(windowsSql + "\r\nSELECT 1;").digest("hex");
+    await database.query("UPDATE schema_migrations SET checksum=$1 WHERE version='001_initial.sql'", [alteredChecksum]);
+    await expect(runMigrations(database)).rejects.toThrow("MIGRATION_CHECKSUM_MISMATCH:001_initial.sql");
   });
 
   it("cria organização, apresentação, autosave e checkpoint persistentes", async () => {
