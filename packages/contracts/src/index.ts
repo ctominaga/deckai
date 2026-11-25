@@ -3,6 +3,10 @@ import { z } from "zod";
 export const IdSchema = z.string().uuid();
 export const RoleSchema = z.enum(["owner", "editor", "reviewer", "viewer"]);
 export const JobStatusSchema = z.enum(["queued", "running", "retrying", "succeeded", "failed", "cancelled", "dead_letter"]);
+export const RequestPdfExportSchema = z.object({
+  versionId: IdSchema,
+  idempotencyKey: IdSchema
+}).strict();
 export const VersionStateSchema = z.enum(["checkpoint", "confirmed"]);
 export const LayoutSchema = z.enum(["cover", "text_image", "two_columns", "metrics", "case", "closing"]);
 
@@ -142,6 +146,16 @@ export const RegenerateSlideSchema = z.object({
   expectedRevision: z.number().int().positive(),
   instruction: z.string().trim().min(1).max(2_000)
 }).strict();
+const rewriteRevision = RegenerateSlideSchema.omit({ instruction: true });
+const rewriteTone = z.string().trim().min(1).max(120);
+export const RewriteBlockSchema = z.discriminatedUnion("operation", [
+  rewriteRevision.extend({ operation: z.literal("summarize") }),
+  rewriteRevision.extend({ operation: z.literal("expand") }),
+  rewriteRevision.extend({ operation: z.literal("tone"), tone: rewriteTone })
+]);
+export type RewriteBlockInput = z.infer<typeof RewriteBlockSchema>;
+export const RewrittenTextSchema = z.object({ text: z.string().trim().min(1).max(4000) }).strict();
+
 export const CreatePresentationSchema = z.object({ title: z.string().trim().min(1).max(180) });
 export const UpdatePresentationSchema = z.object({ title: z.string().trim().min(1).max(180) }).strict();
 export const SaveDraftSchema = z.object({

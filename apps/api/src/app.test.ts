@@ -231,7 +231,7 @@ describe("biblioteca Jump", () => {
 
 describe("geracao de roteiro por IA", () => {
   it("usa somente contexto Jump aprovado, persiste o roteiro e respeita idempotencia", async () => {
-    let calls = 0; let presentationCalls = 0; let regenerationCalls = 0; let receivedContext: Array<{ id: string }> = [];
+    let calls = 0; let presentationCalls = 0; let regenerationCalls = 0; let rewriteCalls = 0; let receivedContext: Array<{ id: string }> = [];
     const provider: OutlineProvider = { name: "deepseek", model: "deepseek-test", async generateOutline(briefing, context) {
       calls++; receivedContext = context;
       return { title: briefing.objective, slides: Array.from({ length: briefing.slideCount }, (_, index) => ({
@@ -250,6 +250,11 @@ describe("geracao de roteiro por IA", () => {
         { type: "text" as const, role: "title" as const, text: title?.type === "text" ? title.text : "Slide" },
         { type: "text" as const, role: "body" as const, text: "Conteúdo regenerado somente neste slide." }
       ], referenceIds: context[0] ? [context[0].id] : [], usage: { total_tokens: 78 } };
+    }, async rewriteBlock(text, request) {
+      rewriteCalls++;
+      expect(text).toBe("Conteúdo regenerado somente neste slide.");
+      expect(request.operation).toBe("summarize");
+      return { text: "Conteúdo regenerado." };
     } };
     const { app } = await setup(provider); const authorization = await bootstrapAndLogin(app);
     const jumpPayload = { kind: "service", title: "Serviço aprovado", text: "Conteúdo institucional aprovado.", sourceLabel: "Fonte interna", validFrom: "2020-01-01", validUntil: "2099-12-31", tags: ["serviço"] };
@@ -289,9 +294,59 @@ describe("geracao de roteiro por IA", () => {
     const outdated = await app.inject({ method: "POST", url: regenerationPath, headers: { authorization }, payload: { ...regenerationPayload, idempotencyKey: randomUUID(), baseVersionId: randomUUID(), expectedRevision: 2 } });
     expect(outdated.json().error.code).toBe("AUTOSAVE_CONFLICT");
     expect(regenerationCalls).toBe(1);
+    const regeneratedDraft = regenerated.json().draft;
+    const blockId = regeneratedDraft.content.slides[0].blocks[1].id;
+    const rewritePath = `/api/v1/presentations/${presentationId}/slides/${firstSlideId}/blocks/${blockId}/rewrite`;
+    const rewritePayload = { idempotencyKey: randomUUID(), baseVersionId: regeneratedDraft.baseVersionId, expectedRevision: 2, operation: "summarize" };
+    const rewritten = await app.inject({ method: "POST", url: rewritePath, headers: { authorization }, payload: rewritePayload });
+    expect(rewritten.statusCode).toBe(200);
+    expect(rewritten.json()).toMatchObject({ rewrittenBlockId: blockId, draft: { revision: 3 } });
+    const expectedContent = structuredClone(regeneratedDraft.content);
+    expectedContent.slides[0].blocks[1].text = "Conteúdo regenerado.";
+    const reloaded = await app.inject({ method: "GET", url: `/api/v1/presentations/${presentationId}`, headers: { authorization } });
+    expect(reloaded.json().draft.content).toEqual(expectedContent);
+    const rewriteReplay = await app.inject({ method: "POST", url: rewritePath, headers: { authorization }, payload: rewritePayload });
+    expect(rewriteReplay.json()).toEqual(rewritten.json());
+    const invalidTone = await app.inject({ method: "POST", url: rewritePath, headers: { authorization }, payload: { ...rewritePayload, idempotencyKey: randomUUID(), operation: "tone" } });
+    expect(invalidTone.statusCode).toBe(422);
+    const staleRewrite = await app.inject({ method: "POST", url: rewritePath, headers: { authorization }, payload: { ...rewritePayload, idempotencyKey: randomUUID() } });
+    expect(staleRewrite.json().error.code).toBe("AUTOSAVE_CONFLICT");
+    expect(rewriteCalls).toBe(1);
     const presentationReplay = await app.inject({ method: "POST", url: `/api/v1/ai/outlines/${generated.json().outline.id as string}/presentation`, headers: { authorization }, payload: { idempotencyKey: presentationKey, provider: "deepseek" } });
     expect(presentationReplay.statusCode).toBe(200); expect(presentationReplay.json().presentation.id).toBe(presentationId); expect(presentationCalls).toBe(1);
     const listed = await app.inject({ method: "GET", url: "/api/v1/ai/outlines", headers: { authorization } });
     expect(listed.json().items).toHaveLength(1); expect(listed.json().items[0].status).toBe("approved");
+  });
+});
+
+describe("fila de exportação PDF", () => {
+  it("persiste a versão solicitada e evita duplicação com pedidos simultâneos", async () => {
+    const { app, database } = await setup();
+    const headers = { authorization: await bootstrapAndLogin(app) };
+    const created = await app.inject({ method: "POST", url: "/api/v1/presentations", headers, payload: { title: "Exportação de teste" } });
+    expect(created.statusCode).toBe(201);
+    const { presentationId, versionId } = created.json();
+    const url = `/api/v1/presentations/${presentationId}/exports/pdf`;
+    const payload = { versionId, idempotencyKey: randomUUID() };
+    const requestPdf = () => app.inject({ method: "POST", url, headers, payload });
+    const responses = await Promise.all([requestPdf(), requestPdf()]);
+    expect(responses.map(response => response.statusCode).sort()).toEqual([200, 202]);
+    const { job } = responses[0]!.json();
+    expect(responses[1]!.json().job).toEqual(job);
+    expect(job).toMatchObject({ presentationId, versionId, format: "pdf", status: "queued", attempt: 0 });
+
+    const statusUrl = `/api/v1/exports/${job.id}`;
+    const restarted = await buildApp(database);
+    try {
+      expect((await restarted.inject({ method: "GET", url: statusUrl, headers })).json()).toEqual({ job });
+      expect((await restarted.inject({ method: "GET", url: statusUrl })).statusCode).toBe(401);
+    } finally {
+      await restarted.close();
+    }
+
+    const incompatible = await app.inject({ method: "POST", url, headers, payload: { ...payload, versionId: randomUUID() } });
+    expect(incompatible.json().error.code).toBe("EXPORT_IDEMPOTENCY_CONFLICT");
+    const missing = await app.inject({ method: "POST", url, headers, payload: { versionId: randomUUID(), idempotencyKey: randomUUID() } });
+    expect(missing.statusCode).toBe(404);
   });
 });

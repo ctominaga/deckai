@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import { AiOutlineSchema, ApproveOutlineSchema, GenerateOutlineSchema, GeneratePresentationFromOutlineSchema, PresentationContentSchema, RegenerateSlideSchema, type PresentationContent } from "@deckai/contracts";
+import { AiOutlineSchema, ApproveOutlineSchema, GenerateOutlineSchema, GeneratePresentationFromOutlineSchema, IdSchema, PresentationContentSchema, RegenerateSlideSchema, RewriteBlockSchema, RewrittenTextSchema, type PresentationContent } from "@deckai/contracts";
 import { AiProviderError, type ApprovedJumpContext, type OutlineProvider } from "../ai-provider.js";
 import { audit } from "../audit.js";
 import { authenticate, requireWrite } from "../auth.js";
@@ -129,73 +129,105 @@ export function registerAiRoutes(app: FastifyInstance, database: Database, provi
     }
   });
 
-  app.post("/api/v1/presentations/:id/slides/:slideId/regenerate", async (request) => {
-    const user = await authenticate(request, database); requireWrite(user);
-    const { id, slideId } = request.params as { id: string; slideId: string }; const body = RegenerateSlideSchema.parse(request.body);
-    const input = { presentationId: id, slideId, baseVersionId: body.baseVersionId, instruction: body.instruction, expectedRevision: body.expectedRevision };
-    const replay = async () => {
-      const result = await database.query<JobRow & { matches: boolean }>(`SELECT id,status,output_json AS output,error_json AS error,
-        (kind='slide_regeneration' AND requested_by=$3 AND input_json=$4::jsonb) AS matches
-        FROM ai_generation_jobs WHERE organization_id=$1 AND idempotency_key=$2`,
-        [user.organizationId, body.idempotencyKey, user.id, JSON.stringify(input)]);
-      const prior = result.rows[0];
-      if (!prior) return undefined;
-      if (prior.matches && prior.status === "succeeded") return prior.output;
-      throw new AppError(409, "AI_IDEMPOTENCY_CONFLICT", "Esta chave já está associada a uma solicitação de IA.", { jobId: prior.id, status: prior.status });
-    };
-    const prior = await replay();
-    if (prior !== undefined) return prior;
-    const draftResult = await database.query<DraftRow>(`SELECT d.presentation_id AS "presentationId",d.base_version_id AS "baseVersionId",d.revision,d.content_json AS content,d.last_mutation_id AS "lastMutationId",d.updated_at AS "updatedAt"
-      FROM presentation_drafts d JOIN presentations p ON p.id=d.presentation_id AND p.organization_id=d.organization_id
-      WHERE d.presentation_id=$1 AND d.organization_id=$2`, [id, user.organizationId]);
-    const currentDraft = draftResult.rows[0]; if (!currentDraft) throw notFound("Apresentação");
-    if (currentDraft.revision !== body.expectedRevision || currentDraft.baseVersionId !== body.baseVersionId) throw new AppError(409, "AUTOSAVE_CONFLICT", "O rascunho mudou antes da regeneração.", { revision: currentDraft.revision });
-    const currentContent = PresentationContentSchema.parse(currentDraft.content); const slideIndex = currentContent.slides.findIndex(slide => slide.slideId === slideId);
-    if (slideIndex < 0) throw notFound("Slide"); const currentSlide = currentContent.slides[slideIndex]!;
-    const jobId = randomUUID(); const startedAt = Date.now();
-    const claimed = await database.query(`INSERT INTO ai_generation_jobs (id,organization_id,requested_by,presentation_id,slide_id,kind,provider,model,prompt_version,status,idempotency_key,input_json)
-      VALUES ($1,$2,$3,$4,$5,'slide_regeneration',$6,$7,'slide-regeneration-v1','running',$8,$9::jsonb)
-      ON CONFLICT (organization_id,idempotency_key) DO NOTHING RETURNING id`, [jobId, user.organizationId, user.id, id, slideId, provider.name, provider.model, body.idempotencyKey, JSON.stringify(input)]);
-    if (!claimed.rows.length) return replay();
-    try {
-      const contextResult = await database.query<ApprovedJumpContext>(`SELECT c.id,c.title,v.body_json->>'text' AS text,v.source_label AS "sourceLabel",v.source_url AS "sourceUrl"
-        FROM jump_contents c JOIN jump_content_versions v ON v.id=c.current_version_id AND v.content_id=c.id
-        WHERE c.organization_id=$1 AND c.status='approved' AND c.current_version_id=c.approved_version_id AND v.source_label<>''
-          AND (v.valid_from IS NULL OR v.valid_from<=CURRENT_DATE) AND (v.valid_until IS NULL OR v.valid_until>=CURRENT_DATE)
-        ORDER BY c.updated_at DESC LIMIT 50`, [user.organizationId]);
-      const generated = await provider.regenerateSlide(currentSlide, body.instruction, contextResult.rows);
-      const allowedReferences = new Set(contextResult.rows.map(item => item.id));
-      if (generated.referenceIds.some(reference => !allowedReferences.has(reference))) {
-        throw new AiProviderError("AI_REFERENCE_NOT_ALLOWED", "A IA informou uma referência não aprovada.", false);
-      }
-      const isTitle = (block: { type: string; role: string }) => block.type === "text" && block.role === "title";
-      const titles = currentSlide.blocks.filter(isTitle);
-      const images = currentSlide.blocks.filter(block => block.type === "image");
-      const generatedBlocks = titles.length ? generated.blocks.filter(block => !isTitle(block)) : generated.blocks;
-      const nextContent = structuredClone(currentContent);
-      nextContent.slides[slideIndex] = {
-        ...currentSlide,
-        blocks: [...titles, ...generatedBlocks.map(block => ({ ...block, id: randomUUID() })), ...images],
-        references: [...new Set(generated.referenceIds)]
+  const slidePath = "/api/v1/presentations/:id/slides/:slideId";
+  for (const kind of ["slide_regeneration", "rewrite"] as const) {
+    const route = kind === "rewrite" ? "/blocks/:blockId/rewrite" : "/regenerate";
+    app.post(slidePath + route, async (request) => {
+      const user = await authenticate(request, database); requireWrite(user);
+      const params = request.params as { id: string; slideId: string; blockId?: string };
+      const id = IdSchema.parse(params.id);
+      const slideId = IdSchema.parse(params.slideId);
+      const body = kind === "rewrite" ? RewriteBlockSchema.parse(request.body) : RegenerateSlideSchema.parse(request.body);
+      const { idempotencyKey, ...edit } = body;
+      const input = {
+        presentationId: id, slideId, ...edit,
+        ...("operation" in edit ? { blockId: IdSchema.parse(params.blockId) } : {})
       };
-      const validContent = PresentationContentSchema.parse(nextContent); const mutationId = randomUUID();
-      const response = await database.transaction(async (tx) => {
-        const updated = await tx.query<DraftRow>(`UPDATE presentation_drafts SET content_json=$1::jsonb,revision=revision+1,last_mutation_id=$2,updated_by=$3,updated_at=now()
-          WHERE presentation_id=$4 AND organization_id=$5 AND revision=$6 AND base_version_id=$7 AND last_mutation_id=$8
-          RETURNING presentation_id AS "presentationId",base_version_id AS "baseVersionId",revision,content_json AS content,last_mutation_id AS "lastMutationId",updated_at AS "updatedAt"`,
-          [JSON.stringify(validContent), mutationId, user.id, id, user.organizationId, body.expectedRevision, body.baseVersionId, currentDraft.lastMutationId]);
-        if (!updated.rows[0]) throw new AppError(409, "AUTOSAVE_CONFLICT", "O rascunho mudou durante a regeneração.");
-        const payload = { job: { id: jobId, status: "succeeded", provider: provider.name, model: provider.model, durationMs: Date.now() - startedAt }, draft: updated.rows[0], regeneratedSlideId: slideId };
-        await tx.query("UPDATE presentations SET updated_at=now() WHERE id=$1 AND organization_id=$2", [id, user.organizationId]);
-        await tx.query("UPDATE ai_generation_jobs SET status='succeeded',output_json=$1::jsonb,usage_json=$2::jsonb,duration_ms=$3,updated_at=now() WHERE id=$4 AND organization_id=$5", [JSON.stringify(payload), JSON.stringify(generated.usage ?? {}), Date.now() - startedAt, jobId, user.organizationId]);
-        await audit(tx, { organizationId: user.organizationId, actorId: user.id, action: "ai.slide.regenerate", entityType: "presentation", entityId: id, requestId: request.id, metadata: { jobId, slideId, revision: updated.rows[0].revision } });
-        return payload;
-      });
-      return response;
-    } catch (error) {
-      const failure = error instanceof AiProviderError ? error : error instanceof AppError ? new AiProviderError(error.code, error.message, error.retryable, error.status) : new AiProviderError("AI_GENERATION_FAILED", "A regeneração do slide falhou.", false);
-      await database.query("UPDATE ai_generation_jobs SET status='failed',error_json=$1::jsonb,duration_ms=$2,updated_at=now() WHERE id=$3 AND organization_id=$4", [JSON.stringify({ code: failure.code, message: failure.message, retryable: failure.retryable }), Date.now() - startedAt, jobId, user.organizationId]);
-      throw new AppError(failure.status, failure.code, failure.message, { jobId }, failure.retryable);
-    }
-  });
+      const replay = async () => {
+        const result = await database.query<JobRow & { matches: boolean }>(`SELECT id,status,output_json AS output,error_json AS error,
+          (kind=$5 AND requested_by=$3 AND input_json=$4::jsonb) AS matches
+          FROM ai_generation_jobs WHERE organization_id=$1 AND idempotency_key=$2`,
+          [user.organizationId, idempotencyKey, user.id, JSON.stringify(input), kind]);
+        const prior = result.rows[0];
+        if (!prior) return undefined;
+        if (prior.matches && prior.status === "succeeded") return prior.output;
+        throw new AppError(409, "AI_IDEMPOTENCY_CONFLICT", "Esta chave já está associada a uma solicitação de IA.", { jobId: prior.id, status: prior.status });
+      };
+      const prior = await replay();
+      if (prior !== undefined) return prior;
+      const draftResult = await database.query<DraftRow>(`SELECT d.presentation_id AS "presentationId",d.base_version_id AS "baseVersionId",d.revision,d.content_json AS content,d.last_mutation_id AS "lastMutationId",d.updated_at AS "updatedAt"
+        FROM presentation_drafts d JOIN presentations p ON p.id=d.presentation_id AND p.organization_id=d.organization_id
+        WHERE d.presentation_id=$1 AND d.organization_id=$2`, [id, user.organizationId]);
+      const currentDraft = draftResult.rows[0]; if (!currentDraft) throw notFound("Apresentação");
+      if (currentDraft.revision !== body.expectedRevision || currentDraft.baseVersionId !== body.baseVersionId) throw new AppError(409, "AUTOSAVE_CONFLICT", "O rascunho mudou antes da edição.", { revision: currentDraft.revision });
+      const currentContent = PresentationContentSchema.parse(currentDraft.content); const slideIndex = currentContent.slides.findIndex(slide => slide.slideId === slideId);
+      if (slideIndex < 0) throw notFound("Slide"); const currentSlide = currentContent.slides[slideIndex]!;
+      const block = "operation" in body ? currentSlide.blocks.find(item => item.id === params.blockId) : undefined;
+      if ("operation" in body) {
+        if (!block) throw notFound("Bloco");
+        if (block.type !== "text" || !block.text.trim()) {
+          throw new AppError(422, "REWRITE_TEXT_REQUIRED", "Selecione um bloco de texto preenchido.");
+        }
+      }
+      const jobId = randomUUID();
+      const startedAt = Date.now();
+      const promptVersion = kind === "rewrite" ? "block-rewrite-v1" : "slide-regeneration-v1";
+      const claimed = await database.query(`INSERT INTO ai_generation_jobs (id,organization_id,requested_by,presentation_id,slide_id,kind,provider,model,prompt_version,status,idempotency_key,input_json)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'running',$10,$11::jsonb)
+        ON CONFLICT (organization_id,idempotency_key) DO NOTHING RETURNING id`, [jobId, user.organizationId, user.id, id, slideId, kind, provider.name, provider.model, promptVersion, idempotencyKey, JSON.stringify(input)]);
+      if (!claimed.rows.length) return replay();
+      try {
+        const nextContent = structuredClone(currentContent);
+        let usage: unknown;
+        if ("operation" in body) {
+          if (block?.type !== "text") throw new Error("Bloco de texto esperado.");
+          const rewritten = await provider.rewriteBlock(block.text, body);
+          usage = rewritten.usage;
+          const { text } = RewrittenTextSchema.parse({ text: rewritten.text });
+          nextContent.slides[slideIndex]!.blocks = currentSlide.blocks.map(item =>
+            item.id === block.id ? { ...block, text } : item
+          );
+        } else {
+          const contextResult = await database.query<ApprovedJumpContext>(`SELECT c.id,c.title,v.body_json->>'text' AS text,v.source_label AS "sourceLabel",v.source_url AS "sourceUrl"
+            FROM jump_contents c JOIN jump_content_versions v ON v.id=c.current_version_id AND v.content_id=c.id
+            WHERE c.organization_id=$1 AND c.status='approved' AND c.current_version_id=c.approved_version_id AND v.source_label<>''
+              AND (v.valid_from IS NULL OR v.valid_from<=CURRENT_DATE) AND (v.valid_until IS NULL OR v.valid_until>=CURRENT_DATE)
+            ORDER BY c.updated_at DESC LIMIT 50`, [user.organizationId]);
+          const generated = await provider.regenerateSlide(currentSlide, body.instruction, contextResult.rows);
+          usage = generated.usage;
+          const allowedReferences = new Set(contextResult.rows.map(item => item.id));
+          if (generated.referenceIds.some(reference => !allowedReferences.has(reference))) {
+            throw new AiProviderError("AI_REFERENCE_NOT_ALLOWED", "A IA informou uma referência não aprovada.", false);
+          }
+          const isTitle = (block: { type: string; role: string }) => block.type === "text" && block.role === "title";
+          const titles = currentSlide.blocks.filter(isTitle);
+          const images = currentSlide.blocks.filter(block => block.type === "image");
+          const generatedBlocks = titles.length ? generated.blocks.filter(block => !isTitle(block)) : generated.blocks;
+          nextContent.slides[slideIndex] = {
+            ...currentSlide,
+            blocks: [...titles, ...generatedBlocks.map(block => ({ ...block, id: randomUUID() })), ...images],
+            references: [...new Set(generated.referenceIds)]
+          };
+        }
+        const validContent = PresentationContentSchema.parse(nextContent); const mutationId = randomUUID();
+        const response = await database.transaction(async (tx) => {
+          const updated = await tx.query<DraftRow>(`UPDATE presentation_drafts SET content_json=$1::jsonb,revision=revision+1,last_mutation_id=$2,updated_by=$3,updated_at=now()
+            WHERE presentation_id=$4 AND organization_id=$5 AND revision=$6 AND base_version_id=$7 AND last_mutation_id=$8
+            RETURNING presentation_id AS "presentationId",base_version_id AS "baseVersionId",revision,content_json AS content,last_mutation_id AS "lastMutationId",updated_at AS "updatedAt"`,
+            [JSON.stringify(validContent), mutationId, user.id, id, user.organizationId, body.expectedRevision, body.baseVersionId, currentDraft.lastMutationId]);
+          if (!updated.rows[0]) throw new AppError(409, "AUTOSAVE_CONFLICT", "O rascunho mudou durante a edição.");
+          const payload = { job: { id: jobId, status: "succeeded", provider: provider.name, model: provider.model, durationMs: Date.now() - startedAt }, draft: updated.rows[0], ...("operation" in body ? { rewrittenSlideId: slideId, rewrittenBlockId: block!.id } : { regeneratedSlideId: slideId }) };
+          await tx.query("UPDATE presentations SET updated_at=now() WHERE id=$1 AND organization_id=$2", [id, user.organizationId]);
+          await tx.query("UPDATE ai_generation_jobs SET status='succeeded',output_json=$1::jsonb,usage_json=$2::jsonb,duration_ms=$3,updated_at=now() WHERE id=$4 AND organization_id=$5", [JSON.stringify(payload), JSON.stringify(usage ?? {}), Date.now() - startedAt, jobId, user.organizationId]);
+          await audit(tx, { organizationId: user.organizationId, actorId: user.id, action: kind === "rewrite" ? "ai.block.rewrite" : "ai.slide.regenerate", entityType: "presentation", entityId: id, requestId: request.id, metadata: { jobId, slideId, blockId: block?.id, revision: updated.rows[0].revision } });
+          return payload;
+        });
+        return response;
+      } catch (error) {
+        const failure = error instanceof AiProviderError ? error : error instanceof AppError ? new AiProviderError(error.code, error.message, error.retryable, error.status) : new AiProviderError("AI_GENERATION_FAILED", "A edição por IA falhou.", false);
+        await database.query("UPDATE ai_generation_jobs SET status='failed',error_json=$1::jsonb,duration_ms=$2,updated_at=now() WHERE id=$3 AND organization_id=$4", [JSON.stringify({ code: failure.code, message: failure.message, retryable: failure.retryable }), Date.now() - startedAt, jobId, user.organizationId]);
+        throw new AppError(failure.status, failure.code, failure.message, { jobId }, failure.retryable);
+      }
+    });
+  }
 }
