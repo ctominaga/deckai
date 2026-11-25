@@ -1,197 +1,59 @@
 # Deck AI
 
-Protótipo e planejamento inicial do Deck AI, uma ferramenta para criar apresentações com IA usando conteúdo institucional rastreável.
+O Deck AI é uma aplicação em desenvolvimento para criar apresentações editáveis com IA e conteúdo institucional rastreável. A aplicação integrada fica em `apps/` e é o ponto de partida para desenvolvimento e testes.
 
-## Aplicação integrada — primeira vertical slice
+## Executar localmente
 
-A nova base da aplicação está em `apps/` e `packages/`. Ela não usa os HTMLs de `preview-dev3` como aplicação oficial.
-
-Pré-requisitos: Node.js 24 ou versão LTS compatível e npm. Para desenvolvimento local não é necessário instalar PostgreSQL: PGlite executa o motor PostgreSQL em arquivo. Em homologação e produção, configure `DATABASE_URL` para um PostgreSQL externo.
+Use Node.js 24 e npm. A partir da raiz do repositório, instale as dependências e prepare o banco local antes de iniciar a aplicação.
 
 ```powershell
-npm.cmd install
+npm.cmd ci
 npm.cmd run db:migrate
 npm.cmd run db:seed
 npm.cmd run dev
 ```
 
-Abra `http://localhost:5173` e use o seed local:
+Abra [a aplicação local](http://localhost:5173/). Em uma instalação nova, o seed de desenvolvimento cria o acesso `dev@deckai.local` com a senha `DeckAI-dev-2026`. Se o banco já tiver usuários, o seed preserva os acessos existentes.
 
-```text
-E-mail: dev@deckai.local
-Senha: DeckAI-dev-2026
-```
+O ambiente padrão usa PGlite persistente em `private-data/`. Para homologação, a API aceita PostgreSQL servidor via `DATABASE_URL`. Use a [referência de configuração](.env.example) para configurar o ambiente. Para chamadas locais ao DeepSeek, configure a chave, o modelo e a habilitação do provedor no arquivo `.env.local`, que fica fora do Git.
 
-O seed é exclusivo de desenvolvimento e recusa execução com `NODE_ENV=production`.
+## O que está disponível na aplicação
 
-Validação completa:
+- Login, organizações, membros e permissões aplicadas no servidor.
+- Criação de apresentações, edição básica de texto e indicadores, autosave, versões, restauração de rascunho e visualização HTML 16:9.
+- Biblioteca Jump com busca, tipos, tags, fontes, validade e histórico de aprovação. Os exemplos públicos entram como rascunhos. A consulta de contexto da IA seleciona conteúdo aprovado e vigente.
+- Geração de roteiro com DeepSeek, aprovação do roteiro e geração de slides salvos no editor. Esse fluxo foi testado com o provedor real.
+- Regeneração do slide selecionado pelo editor. A API preserva os demais slides e recusa gravações sobre rascunhos que mudaram. O fluxo passou com provedor de teste e segue em validação com o DeepSeek real.
+
+## Frentes de trabalho
+
+O **Dev 3** conduz API, autenticação e permissões, banco, versões, Biblioteca Jump, integração de IA no servidor, filas, armazenamento e exportações PDF/PPTX. Os próximos itens dessa frente são validar a regeneração real, implementar a reescrita de blocos e avançar na fila persistente, no armazenamento privado e nas exportações com downloads autorizados.
+
+O **Dev 2** conduz a experiência de criação e revisão, o editor, o modo de apresentação e o HTML autônomo. A integração passa pelo JSON versionado da apresentação, pelos seis layouts e pelos contratos REST. Consulte a [referência da API](docs/api-v1.md) e a [arquitetura da primeira entrega](docs/vertical-slice-01.md).
+
+A homologação externa, o PostgreSQL em servidor, o backup automatizado e os testes de fidelidade PDF/PPTX seguem pendentes.
+
+## Onde fica cada coisa
+
+| Caminho | Uso |
+| --- | --- |
+| `apps/web` e `apps/api` | Aplicação integrada e API |
+| `packages/contracts` e `packages/renderer` | Contratos TypeScript e renderização HTML compartilhada |
+| `db/migrations` | Migrations versionadas |
+| `preview-dev3` e `platform` | Protótipos históricos e módulos de demonstração |
+| `proof`, `examples` e `assets` | Prova de editor e HTML offline do Dev 2 |
+
+A prévia cotidiana é a aplicação rodando com `npm.cmd run dev`. Os protótipos e a prova do Dev 2 continuam disponíveis para comparar layouts, edição, apresentação e HTML offline. A prova é independente da API e usa conteúdo sintético. Veja [como abrir e testar a prova](proof/README.md).
+
+## Validação
 
 ```powershell
 npm.cmd test
-npm.cmd run test:legacy
-npm.cmd run typecheck
 npm.cmd run build
 ```
 
-Detalhes da arquitetura e da entrega estão em `docs/vertical-slice-01.md`. Os contratos REST estão em `docs/api-v1.md`.
-
-## Base legada e protótipos
-
-O projeto está na fase de fundação local. Já existem:
-
-- proposta técnica;
-- contratos compartilhados;
-- schema JSON de apresentação;
-- modelo de dados da plataforma;
-- dados simulados;
-- armazenamento local de apresentações e versões;
-- armazenamento local de conteúdo Jump;
-- armazenamento local de jobs;
-- permissões locais;
-- validação de conteúdo Jump;
-- prévia visual;
-- protótipo funcional local.
-
-Além dos módulos visuais em `localStorage`, já existe uma primeira API persistente de desenvolvimento. Ela oferece login, permissões, apresentações versionadas e aprovação de conteúdo Jump. O arquivo JSON usado localmente facilita os testes, mas ainda será substituído por PostgreSQL antes da produção.
-
-## Executar a API persistente
-
-Na raiz do repositório:
-
-```powershell
-node platform/api/server.mjs
-```
-
-A API fica disponível em `http://127.0.0.1:8788`. Consulte `platform/api/README.md` para criar o primeiro gestor e autenticar.
-
-Para executar os testes sem depender do comando `npm` no PowerShell:
-
-```powershell
-node --test platform/api/*.test.mjs
-```
-
-## Abrir a prévia
-
-Na pasta `preview-dev3`, execute:
-
-```powershell
-python -m http.server 5173
-```
-
-Depois acesse:
-
-```text
-http://localhost:5173
-```
-
-O protótipo funcional fica em:
-
-```text
-http://localhost:5173/prototipo.html
-```
-
-## Prova visual do editor (Dev 2)
-
-Na raiz do repositório, gere novamente a página autônoma após alterar a prova:
-
-```powershell
-py -3 proof/build.py
-```
-
-O build também atualiza `preview-dev3/editor-dev2.html`. Com o servidor da seção anterior, abra `http://localhost:5173/editor-dev2.html` ou use o link na visão geral e no protótipo. A prova mostra seis layouts 16:9, edição local de textos e métricas, miniaturas, apresentação, exportação HTML e impressão. O arquivo `proof/dist/deck.html` pode ser aberto offline.
-
-Esta é uma demonstração independente com conteúdo sintético e contrato JSON provisório. Ela ainda não lê apresentações da API ou do armazenamento local do Dev 3, nem gera PDF ou PPTX. Consulte [a documentação da prova](proof/README.md) para testar e conhecer os limites.
-
-## O que testar no protótipo
-
-1. Criar uma apresentação.
-2. Salvar uma versão local.
-3. Cadastrar conteúdo Jump com fonte.
-4. Enviar o conteúdo para revisão.
-5. Aprovar o conteúdo.
-6. Criar um job de exportação.
-7. Repetir o mesmo job e observar a regra de idempotência.
-
-## Estrutura principal
-
-```text
-shared/                  contratos entre os desenvolvedores
-platform/                plataforma, conteúdo Jump e exportações
-platform/local-store/    protótipos locais sem backend
-platform/mock-data/      dados de demonstração
-platform/validation/     validações locais
-platform/api/            API persistente de desenvolvimento
-preview-dev3/            prévia visual e protótipo funcional
-proof/                   fonte e build da prova visual do Dev 2
-examples/                apresentação sintética da prova
-assets/                  imagens neutras da prova
-```
-
-## Próxima etapa recomendada
-
-Validar com os três desenvolvedores:
-
-1. schema JSON;
-2. estados do conteúdo Jump;
-3. permissões;
-4. contrato de criação de apresentação;
-5. contrato de exportação.
-
-Depois disso, conectar as telas à nova API e migrar a persistência de desenvolvimento para PostgreSQL.
-
-## Status de 16/11/2026
-
-### Concluído
-
-- contratos compartilhados e schema JSON;
-- modelo de dados inicial;
-- protótipos locais de apresentações, versões, conteúdo Jump, permissões, jobs, auditoria e backup;
-- validação de conteúdo Jump;
-- validação de respostas da IA;
-- API local simulada;
-- página local de teste da API;
-- visualizador local de apresentações, versões e slides;
-- editor local com novas versões e duplicação;
-- adaptador inicial para DeepSeek;
-- configuração segura por variável de ambiente;
-- commits sincronizados na branch `main`.
-- API persistente de desenvolvimento com autenticação e sessões;
-- permissões aplicadas pelo backend;
-- CRUD inicial de apresentações com histórico e conflito de versão;
-- fluxo Jump de rascunho, revisão, aprovação, rejeição e arquivamento;
-- filtro para fornecer à IA somente conteúdo aprovado e válido;
-- trilha básica de auditoria;
-- testes automatizados da autenticação, versionamento e política Jump.
-
-### Em andamento
-
-- conectar o adaptador DeepSeek aos endpoints de IA;
-- conectar o visualizador ao JSON completo de layouts;
-- integrar o editor aos blocos completos do JSON;
-- integrar a API local com o protótipo visual;
-- definir o formato final dos contratos com o Desenvolvedor 2;
-- testar geração real com a chave local;
-- substituir a persistência JSON de desenvolvimento por PostgreSQL;
-
-### Pendentes
-
-- banco PostgreSQL de produção;
-- tela de login conectada à autenticação já disponível na API;
-- storage privado;
-- fila e workers de produção;
-- integração real com Gemini;
-- exportações reais em PDF e PPTX;
-- área administrativa completa;
-- testes integrados e de segurança.
-
-### Próximos passos
-
-1. selecionar o provedor por configuração (`mock`, `deepseek` ou `gemini`);
-2. conectar DeepSeek ao endpoint de roteiro;
-3. validar uma resposta real contra o schema;
-4. conectar geração real ao protótipo;
-5. registrar custo, tokens, duração e erros.
+A suíte legada pode ser executada separadamente com `npm.cmd run test:legacy`.
 
 ## Segurança
 
-Arquivos de cliente e materiais confidenciais não devem ser enviados ao repositório. O `.gitignore` bloqueia formatos comuns como PPTX, PDF, DOCX e XLSX.
+Mantenha chaves, banco local e materiais confidenciais de clientes fora do Git. Use o seed apenas no ambiente de desenvolvimento.
