@@ -243,14 +243,22 @@ Use `summarize` para resumir, `expand` para expandir e `tone` para ajustar o tom
 
 Para habilitar chamadas reais, crie `.env.local` fora do Git com `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` e `DECKAI_ENABLE_REAL_DEEPSEEK=true`. Sem isso, o endpoint retorna erro controlado e não simula sucesso.
 
-## Pedidos de exportação PDF
+## Exportações PDF e PPTX
 
-### `POST /api/v1/presentations/:id/exports/pdf`
+### `POST /api/v1/presentations/:id/exports/:format`
 
-Owners e editores podem enfileirar o PDF de uma versão salva. Envie `versionId` e `idempotencyKey` como UUIDs. Para exportar alterações do rascunho, crie um checkpoint e use o ID da versão criada.
+Owners e editores podem enfileirar uma versão salva nos formatos `pdf` ou `pptx`. Envie `versionId` e `idempotencyKey` como UUIDs. Para exportar alterações do rascunho, crie um checkpoint e use o ID da versão criada.
 
 A API responde com `202` e `{ job }` ao criar o pedido. Repetir a mesma solicitação com a mesma chave retorna o pedido existente com `200`. Reutilizar a chave para outra solicitação retorna `409 EXPORT_IDEMPOTENCY_CONFLICT`.
 
 ### `GET /api/v1/exports/:id`
 
-Consulta `{ job }` pelo ID retornado na criação. A consulta exige autenticação e respeita a organização da sessão. Nesta etapa, o pedido permanece em `queued` até a integração do worker que gera o PDF.
+Consulta `{ job }` pelo ID retornado na criação. A consulta exige autenticação e respeita a organização da sessão. O worker passa por `queued`, `running` e `succeeded` em uma execução normal. Falhas temporárias entram em `retrying`; depois de esgotar as tentativas, o pedido entra em `dead_letter`.
+
+### `GET /api/v1/exports/:id/download`
+
+Retorna o arquivo como anexo para uma sessão da mesma organização. Pedidos ainda sem arquivo retornam `409 EXPORT_NOT_READY`. A interface pode fazer a requisição com o mesmo token da API e baixar o corpo como arquivo. A resposta usa `Cache-Control: private, no-store`.
+
+No ambiente local, a API roda os workers no mesmo processo e armazena arquivos de até 10 MiB no banco. O PDF imprime uma página 16:9 por slide com Edge, Chrome ou Chromium. Configure `PDF_BROWSER_PATH` para indicar o executável ou `PDF_WORKER_ENABLED=false` para desativar o worker de PDF.
+
+O PPTX usa o JSON da mesma versão salva e gera slides 16:9 com caixas de texto editáveis para títulos, textos e indicadores. Imagens aparecem como texto de placeholder. A composição é própria do PowerPoint e a fidelidade visual ainda precisa de validação com apresentações reais.
