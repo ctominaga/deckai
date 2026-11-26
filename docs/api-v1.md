@@ -176,6 +176,8 @@ Retorna o conteúdo, todas as versões e o histórico de submissão, aprovação
 
 A restauração transforma um item arquivado em rascunho e não recupera aprovação anterior. A aprovação exige fonte, início e fim de validade. Transições inválidas retornam HTTP 409.
 
+Na listagem, `effectiveStatus` mostra `scheduled` para conteúdo aprovado cujo início de validade ainda não chegou e `expired` após o fim da validade. O `status` editorial continua `approved` nesses dois casos.
+
 ### `POST /api/v1/jump-contents/examples`
 
 Carrega seis exemplos extraídos do site institucional como rascunhos que ainda exigem revisão humana, definição de validade e aprovação. A operação é idempotente: chamadas posteriores ignoram os exemplos já existentes.
@@ -189,6 +191,8 @@ Contrato dedicado aos futuros jobs de IA. Retorna exclusivamente a versão atual
 ### `POST /api/v1/ai/outlines`
 
 Gera e persiste um roteiro usando DeepSeek. A solicitação exige `idempotencyKey` UUID e um briefing com prompt, objetivo, público, tom, idioma e quantidade de slides. O backend fornece ao modelo somente conteúdo Jump aprovado e vigente, rejeita referências desconhecidas e registra modelo, duração, uso e erro sanitizado.
+
+Repetir a mesma chave com a mesma operação e entrada retorna o resultado anterior se o job tiver concluído com sucesso. Jobs em andamento ou com falha, e chaves reutilizadas com outro briefing, provedor ou tipo de geração, retornam HTTP 409.
 
 ```json
 {
@@ -221,9 +225,13 @@ Aprova um roteiro em rascunho usando controle otimista por `expectedRevision`. A
 
 Desenvolve os slides de um roteiro aprovado, valida quantidade, ordem, layouts, títulos e referências e persiste uma apresentação canônica com versão inicial e rascunho editável. A solicitação exige uma nova `idempotencyKey`; repeti-la retorna a mesma apresentação sem nova chamada ao provedor.
 
+Slides com texto institucional ou métricas precisam de referências aprovadas. Na apresentação persistida, `slides[].references` guarda os IDs das **versões imutáveis** dos conteúdos Jump usados; o roteiro e a resposta do provedor ainda identificam os conteúdos por seus IDs. Editar um conteúdo Jump depois da geração não altera a versão de fonte registrada no slide.
+
 ### `POST /api/v1/presentations/:id/slides/:slideId/regenerate`
 
 Owners e editores podem refazer o conteúdo de um slide do rascunho. Envie `idempotencyKey`, `baseVersionId`, `expectedRevision` e `instruction`. A operação mantém o layout, o título existente, as imagens e os demais slides. O retorno inclui `job`, `draft` atualizado e `regeneratedSlideId`. Se outra alteração mudar o rascunho durante a chamada, a API retorna `409 AUTOSAVE_CONFLICT`.
+
+A regeneração exige referências aprovadas para afirmações institucionais e guarda no rascunho os IDs das versões imutáveis das fontes Jump usadas.
 
 ### `POST /api/v1/presentations/:id/slides/:slideId/blocks/:blockId/rewrite`
 

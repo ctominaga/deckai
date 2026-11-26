@@ -24,6 +24,8 @@ Senha: DeckAI-dev-2026
 
 O seed é exclusivo de desenvolvimento e recusa execução com `NODE_ENV=production`.
 
+A aplicação oferece um link para a prova visual do editor do Dev 2 em `/editor-dev2.html`. A página é uma demonstração independente com dados sintéticos; ainda não usa o schema `1.0` nem salva apresentações pela API. `py -3 proof/build.py` atualiza o HTML servido pela aplicação e pela prévia legada.
+
 Validação completa:
 
 ```powershell

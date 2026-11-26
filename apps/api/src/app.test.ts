@@ -25,6 +25,12 @@ async function bootstrapAndLogin(app: Awaited<ReturnType<typeof buildApp>>) {
   return `Bearer ${login.json().token as string}`;
 }
 
+const unusedProviderMethods: Pick<OutlineProvider, "generatePresentation" | "regenerateSlide" | "rewriteBlock"> = {
+  async generatePresentation() { throw new Error("Chamada inesperada ao provedor no teste."); },
+  async regenerateSlide() { throw new Error("Chamada inesperada ao provedor no teste."); },
+  async rewriteBlock() { throw new Error("Chamada inesperada ao provedor no teste."); }
+};
+
 describe("primeira vertical slice", () => {
   it("aplica a migration de forma idempotente", async () => {
     const { database } = await setup();
@@ -234,11 +240,99 @@ describe("biblioteca Jump", () => {
     await app.inject({ method: "POST", url: `/api/v1/jump-contents/${id}/approve`, headers: { authorization: ownerAuthorization }, payload: {} });
     const list = await app.inject({ method: "GET", url: "/api/v1/jump-contents", headers: { authorization: ownerAuthorization } });
     expect(list.json().items[0].effectiveStatus).toBe("expired");
+    const future = await app.inject({ method: "POST", url: "/api/v1/jump-contents", headers: { authorization: ownerAuthorization }, payload: { ...payload, title: "Indicador futuro", validFrom: "2099-01-01", validUntil: "2099-12-31" } });
+    const futureId = future.json().id as string;
+    await app.inject({ method: "POST", url: `/api/v1/jump-contents/${futureId}/submit`, headers: { authorization: ownerAuthorization }, payload: {} });
+    await app.inject({ method: "POST", url: `/api/v1/jump-contents/${futureId}/approve`, headers: { authorization: ownerAuthorization }, payload: {} });
+    const refreshed = await app.inject({ method: "GET", url: "/api/v1/jump-contents", headers: { authorization: ownerAuthorization } });
+    expect(refreshed.json().items.find((item: { id: string }) => item.id === futureId).effectiveStatus).toBe("scheduled");
     expect((await app.inject({ method: "GET", url: "/api/v1/jump-context", headers: { authorization: ownerAuthorization } })).json().items).toHaveLength(0);
   });
 });
 
 describe("geracao de roteiro por IA", () => {
+  it("serializa pedidos simultâneos com a mesma chave de idempotência", async () => {
+    let calls = 0;
+    const provider: OutlineProvider = { name: "deepseek", model: "deepseek-test", ...unusedProviderMethods, async generateOutline(briefing) {
+      calls++;
+      await new Promise(resolve => setTimeout(resolve, 25));
+      return { title: briefing.objective, slides: [{ title: "Capa", objective: "Abrir proposta", layout: "cover", keyPoints: ["Introdução"], referenceIds: [] }] };
+    } };
+    const { app, database } = await setup(provider);
+    const authorization = await bootstrapAndLogin(app);
+    const payload = { idempotencyKey: randomUUID(), provider: "deepseek", briefing: {
+      prompt: "Crie uma proposta", objective: "Proposta", audience: "Diretoria", tone: "consultivo", language: "pt-BR", slideCount: 1
+    } };
+    const requestOutline = () => app.inject({ method: "POST", url: "/api/v1/ai/outlines", headers: { authorization }, payload });
+    const responses = await Promise.all([requestOutline(), requestOutline()]);
+    expect(responses.map(response => response.statusCode)).toContain(201);
+    expect(responses.every(response => [200, 201, 409].includes(response.statusCode))).toBe(true);
+    for (const response of responses) if (response.statusCode === 409) expect(response.json().error.code).toBe("AI_IDEMPOTENCY_CONFLICT");
+    expect(calls).toBe(1);
+    const jobs = await database.query<{ count: number }>("SELECT count(*)::int AS count FROM ai_generation_jobs WHERE kind='outline'");
+    expect(jobs.rows[0]?.count).toBe(1);
+  });
+
+  it("rejeita apresentação factual sem fonte antes de persistir", async () => {
+    const provider: OutlineProvider = { name: "deepseek", model: "deepseek-test", ...unusedProviderMethods,
+      async generateOutline() { return { title: "Proposta", slides: [{ title: "Capa", objective: "Abrir proposta", layout: "cover", keyPoints: ["Pendência"], referenceIds: [] }] }; },
+      async generatePresentation() { return { slides: [{ layout: "cover", referenceIds: [], blocks: [
+        { type: "text" as const, role: "title" as const, text: "Capa" },
+        { type: "text" as const, role: "body" as const, text: "A Jump atende 100 clientes." }
+      ] }] }; }
+    };
+    const { app, database } = await setup(provider); const authorization = await bootstrapAndLogin(app);
+    const outline = await app.inject({ method: "POST", url: "/api/v1/ai/outlines", headers: { authorization }, payload: {
+      idempotencyKey: randomUUID(), provider: "deepseek", briefing: { prompt: "Crie proposta", objective: "Proposta", audience: "Diretoria", tone: "consultivo", language: "pt-BR", slideCount: 1 }
+    } });
+    expect(outline.statusCode).toBe(201);
+    const outlineId = outline.json().outline.id as string;
+    await app.inject({ method: "POST", url: `/api/v1/ai/outlines/${outlineId}/approve`, headers: { authorization }, payload: { expectedRevision: 1 } });
+    const rejected = await app.inject({ method: "POST", url: `/api/v1/ai/outlines/${outlineId}/presentation`, headers: { authorization }, payload: { idempotencyKey: randomUUID(), provider: "deepseek" } });
+    expect(rejected.statusCode).toBe(502); expect(rejected.json().error.code).toBe("AI_CLAIM_WITHOUT_REFERENCE");
+    const presentations = await database.query<{ count: number }>("SELECT count(*)::int AS count FROM presentations");
+    expect(presentations.rows[0]?.count).toBe(0);
+    const jobs = await database.query<{ status: string }>("SELECT status FROM ai_generation_jobs WHERE kind='presentation'");
+    expect(jobs.rows[0]?.status).toBe("failed");
+  });
+
+  it("recusa regeneração factual sem fonte sem alterar o rascunho", async () => {
+    const provider: OutlineProvider = { name: "deepseek", model: "deepseek-test", ...unusedProviderMethods,
+      async generateOutline() { return { title: "Nossa proposta", slides: [{ title: "Nossa proposta", objective: "Apresentar", layout: "cover", keyPoints: ["Introdução"], referenceIds: [] }] }; },
+      async generatePresentation() { return { slides: [{ layout: "cover", referenceIds: [], blocks: [
+        { type: "text" as const, role: "title" as const, text: "Nossa proposta" },
+        { type: "text" as const, role: "body" as const, text: "Informação a confirmar" }
+      ] }] }; },
+      async regenerateSlide() { return { referenceIds: [], blocks: [
+        { type: "text" as const, role: "title" as const, text: "Nossa proposta" },
+        { type: "text" as const, role: "body" as const, text: "A Jump atende 100 clientes." }
+      ] }; }
+    };
+    const { app, database } = await setup(provider);
+    const authorization = await bootstrapAndLogin(app);
+    const outline = await app.inject({ method: "POST", url: "/api/v1/ai/outlines", headers: { authorization }, payload: {
+      idempotencyKey: randomUUID(), provider: "deepseek", briefing: { prompt: "Crie proposta", objective: "Nossa proposta", audience: "Diretoria", tone: "consultivo", language: "pt-BR", slideCount: 1 }
+    } });
+    expect(outline.statusCode).toBe(201);
+    const outlineId = outline.json().outline.id as string;
+    expect((await app.inject({ method: "POST", url: `/api/v1/ai/outlines/${outlineId}/approve`, headers: { authorization }, payload: { expectedRevision: 1 } })).statusCode).toBe(200);
+    const presentation = await app.inject({ method: "POST", url: `/api/v1/ai/outlines/${outlineId}/presentation`, headers: { authorization }, payload: { idempotencyKey: randomUUID(), provider: "deepseek" } });
+    expect(presentation.statusCode).toBe(201);
+    const presentationId = presentation.json().presentation.id as string;
+    const initial = await app.inject({ method: "GET", url: `/api/v1/presentations/${presentationId}`, headers: { authorization } });
+    const draft = initial.json().draft;
+    const slideId = draft.content.slides[0].slideId as string;
+    const rejected = await app.inject({ method: "POST", url: `/api/v1/presentations/${presentationId}/slides/${slideId}/regenerate`, headers: { authorization }, payload: {
+      idempotencyKey: randomUUID(), baseVersionId: draft.baseVersionId, expectedRevision: draft.revision, instruction: "Inclua dados da Jump"
+    } });
+    expect(rejected.statusCode).toBe(502);
+    expect(rejected.json().error.code).toBe("AI_CLAIM_WITHOUT_REFERENCE");
+    const after = await app.inject({ method: "GET", url: `/api/v1/presentations/${presentationId}`, headers: { authorization } });
+    expect(after.json().draft).toEqual(draft);
+    const jobs = await database.query<{ status: string }>("SELECT status FROM ai_generation_jobs WHERE kind='slide_regeneration'");
+    expect(jobs.rows[0]?.status).toBe("failed");
+  });
+
   it("usa somente contexto Jump aprovado, persiste o roteiro e respeita idempotencia", async () => {
     let calls = 0; let presentationCalls = 0; let regenerationCalls = 0; let rewriteCalls = 0; let receivedContext: Array<{ id: string }> = [];
     const provider: OutlineProvider = { name: "deepseek", model: "deepseek-test", async generateOutline(briefing, context) {
@@ -269,6 +363,7 @@ describe("geracao de roteiro por IA", () => {
     const jumpPayload = { kind: "service", title: "Serviço aprovado", text: "Conteúdo institucional aprovado.", sourceLabel: "Fonte interna", validFrom: "2020-01-01", validUntil: "2099-12-31", tags: ["serviço"] };
     const jump = await app.inject({ method: "POST", url: "/api/v1/jump-contents", headers: { authorization }, payload: jumpPayload });
     const jumpId = jump.json().id as string;
+    const jumpVersionId = jump.json().currentVersionId as string;
     await app.inject({ method: "POST", url: `/api/v1/jump-contents/${jumpId}/submit`, headers: { authorization }, payload: {} });
     await app.inject({ method: "POST", url: `/api/v1/jump-contents/${jumpId}/approve`, headers: { authorization }, payload: {} });
     await app.inject({ method: "POST", url: "/api/v1/jump-contents", headers: { authorization }, payload: { ...jumpPayload, title: "Rascunho não aprovado" } });
@@ -280,21 +375,26 @@ describe("geracao de roteiro por IA", () => {
     expect(receivedContext.map(item => item.id)).toEqual([jumpId]);
     const replay = await app.inject({ method: "POST", url: "/api/v1/ai/outlines", headers: { authorization }, payload: requestPayload });
     expect(replay.statusCode).toBe(200); expect(replay.json().outline.id).toBe(generated.json().outline.id); expect(calls).toBe(1);
+    const alteredBriefing = await app.inject({ method: "POST", url: "/api/v1/ai/outlines", headers: { authorization }, payload: { ...requestPayload, briefing: { ...requestPayload.briefing, objective: "Objetivo alterado" } } });
+    expect(alteredBriefing.statusCode).toBe(409); expect(alteredBriefing.json().error.code).toBe("AI_IDEMPOTENCY_CONFLICT"); expect(calls).toBe(1);
     const approved = await app.inject({ method: "POST", url: `/api/v1/ai/outlines/${generated.json().outline.id as string}/approve`, headers: { authorization }, payload: { expectedRevision: 1 } });
     expect(approved.statusCode).toBe(200); expect(approved.json().status).toBe("approved");
+    const crossEndpoint = await app.inject({ method: "POST", url: `/api/v1/ai/outlines/${generated.json().outline.id as string}/presentation`, headers: { authorization }, payload: { idempotencyKey, provider: "deepseek" } });
+    expect(crossEndpoint.statusCode).toBe(409); expect(crossEndpoint.json().error.code).toBe("AI_IDEMPOTENCY_CONFLICT"); expect(presentationCalls).toBe(0);
     const presentationKey = randomUUID();
     const presentation = await app.inject({ method: "POST", url: `/api/v1/ai/outlines/${generated.json().outline.id as string}/presentation`, headers: { authorization }, payload: { idempotencyKey: presentationKey, provider: "deepseek" } });
     expect(presentation.statusCode).toBe(201);
     const presentationId = presentation.json().presentation.id as string;
     const editor = await app.inject({ method: "GET", url: `/api/v1/presentations/${presentationId}`, headers: { authorization } });
     expect(editor.statusCode).toBe(200); expect(editor.json().draft.content.slides).toHaveLength(2);
-    expect(editor.json().draft.content.slides[0].references).toEqual([jumpId]);
+    expect(editor.json().draft.content.slides[0].references).toEqual([jumpVersionId]);
     const untouchedSlide = structuredClone(editor.json().draft.content.slides[1]); const firstSlideId = editor.json().draft.content.slides[0].slideId as string; const regenerationKey = randomUUID();
     const regenerationPath = `/api/v1/presentations/${presentationId}/slides/${firstSlideId}/regenerate`;
     const regenerationPayload = { idempotencyKey: regenerationKey, baseVersionId: editor.json().draft.baseVersionId, expectedRevision: 1, instruction: "Deixe o texto mais direto" };
     const regenerated = await app.inject({ method: "POST", url: regenerationPath, headers: { authorization }, payload: regenerationPayload });
     expect(regenerated.statusCode).toBe(200); expect(regenerated.json().draft.revision).toBe(2);
     expect(regenerated.json().draft.content.slides[0].blocks[1].text).toContain("regenerado");
+    expect(regenerated.json().draft.content.slides[0].references).toEqual([jumpVersionId]);
     expect(regenerated.json().draft.content.slides[1]).toEqual(untouchedSlide);
     const regenerationReplay = await app.inject({ method: "POST", url: regenerationPath, headers: { authorization }, payload: regenerationPayload });
     expect(regenerationReplay.statusCode).toBe(200); expect(regenerationReplay.json().draft.revision).toBe(2); expect(regenerationCalls).toBe(1);
@@ -323,8 +423,23 @@ describe("geracao de roteiro por IA", () => {
     expect(rewriteCalls).toBe(1);
     const presentationReplay = await app.inject({ method: "POST", url: `/api/v1/ai/outlines/${generated.json().outline.id as string}/presentation`, headers: { authorization }, payload: { idempotencyKey: presentationKey, provider: "deepseek" } });
     expect(presentationReplay.statusCode).toBe(200); expect(presentationReplay.json().presentation.id).toBe(presentationId); expect(presentationCalls).toBe(1);
+    const reverseCrossEndpoint = await app.inject({ method: "POST", url: "/api/v1/ai/outlines", headers: { authorization }, payload: { ...requestPayload, idempotencyKey: presentationKey } });
+    expect(reverseCrossEndpoint.statusCode).toBe(409); expect(reverseCrossEndpoint.json().error.code).toBe("AI_IDEMPOTENCY_CONFLICT");
+    const editedJump = await app.inject({ method: "PUT", url: `/api/v1/jump-contents/${jumpId}`, headers: { authorization }, payload: { ...jumpPayload, text: "Conteúdo institucional atualizado." } });
+    expect(editedJump.statusCode).toBe(200);
+    expect(editedJump.json().currentVersionId).not.toBe(jumpVersionId);
+    const afterSourceEdit = await app.inject({ method: "GET", url: `/api/v1/presentations/${presentationId}`, headers: { authorization } });
+    expect(afterSourceEdit.json().draft.content.slides[0].references).toEqual([jumpVersionId]);
+    const originalVersion = await app.inject({ method: "GET", url: `/api/v1/jump-contents/${jumpId}`, headers: { authorization } });
+    expect(originalVersion.json().versions.find((version: { id: string }) => version.id === jumpVersionId).body.text).toBe(jumpPayload.text);
     const listed = await app.inject({ method: "GET", url: "/api/v1/ai/outlines", headers: { authorization } });
     expect(listed.json().items).toHaveLength(1); expect(listed.json().items[0].status).toBe("approved");
+    const secondOutline = await app.inject({ method: "POST", url: "/api/v1/ai/outlines", headers: { authorization }, payload: { ...requestPayload, idempotencyKey: randomUUID() } });
+    expect(secondOutline.statusCode).toBe(201);
+    const secondOutlineId = secondOutline.json().outline.id as string;
+    await app.inject({ method: "POST", url: `/api/v1/ai/outlines/${secondOutlineId}/approve`, headers: { authorization }, payload: { expectedRevision: 1 } });
+    const otherResource = await app.inject({ method: "POST", url: `/api/v1/ai/outlines/${secondOutlineId}/presentation`, headers: { authorization }, payload: { idempotencyKey: presentationKey, provider: "deepseek" } });
+    expect(otherResource.statusCode).toBe(409); expect(otherResource.json().error.code).toBe("AI_IDEMPOTENCY_CONFLICT"); expect(presentationCalls).toBe(1);
   });
 });
 

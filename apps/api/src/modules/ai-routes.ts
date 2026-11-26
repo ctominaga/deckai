@@ -1,14 +1,15 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { AiOutlineSchema, ApproveOutlineSchema, GenerateOutlineSchema, GeneratePresentationFromOutlineSchema, IdSchema, PresentationContentSchema, RegenerateSlideSchema, RewriteBlockSchema, RewrittenTextSchema, type PresentationContent } from "@deckai/contracts";
-import { AiProviderError, type ApprovedJumpContext, type OutlineProvider } from "../ai-provider.js";
+import { AiProviderError, validateGeneratedSlideEvidence, validatePresentationEvidence, type ApprovedJumpContext, type OutlineProvider } from "../ai-provider.js";
 import { audit } from "../audit.js";
 import { authenticate, requireWrite } from "../auth.js";
 import type { Database } from "../database.js";
 import { AppError, notFound } from "../errors.js";
 import { contentHash } from "../security.js";
 
-type JobRow = { id: string; status: string; output: unknown; error: unknown };
+type JobRow = { id: string; status: string; kind: string; outlineId: string | null; inputMatches: boolean; output: unknown };
+type VersionedJumpContext = ApprovedJumpContext & { versionId: string };
 type OutlineRow = { id: string; title: string; status: "draft" | "approved"; revision: number; briefing: unknown; slides: unknown[]; createdAt: string; updatedAt: string };
 type DraftRow = { presentationId: string; baseVersionId: string; revision: number; content: PresentationContent; lastMutationId: string; updatedAt: string };
 
@@ -19,15 +20,21 @@ export function registerAiRoutes(app: FastifyInstance, database: Database, provi
   app.post("/api/v1/ai/outlines", async (request, reply) => {
     const user = await authenticate(request, database); requireWrite(user);
     const body = GenerateOutlineSchema.parse(request.body);
-    const prior = await database.query<JobRow>("SELECT id,status,output_json AS output,error_json AS error FROM ai_generation_jobs WHERE organization_id=$1 AND idempotency_key=$2", [user.organizationId, body.idempotencyKey]);
-    if (prior.rows[0]) {
+    const replay = async () => {
+      const prior = await database.query<JobRow>("SELECT id,status,kind,outline_id AS \"outlineId\",input_json=$3::jsonb AS \"inputMatches\",output_json AS output FROM ai_generation_jobs WHERE organization_id=$1 AND idempotency_key=$2", [user.organizationId, body.idempotencyKey, JSON.stringify(body)]);
+      if (!prior.rows[0]) return undefined;
+      if (prior.rows[0].kind !== "outline" || !prior.rows[0].inputMatches) throw new AppError(409, "AI_IDEMPOTENCY_CONFLICT", "Esta chave de idempotência já foi usada para outra solicitação de IA.", { jobId: prior.rows[0].id });
       if (prior.rows[0].status === "succeeded") return prior.rows[0].output;
       throw new AppError(409, "AI_IDEMPOTENCY_CONFLICT", "Esta solicitação de IA já foi processada ou ainda está em andamento.", { jobId: prior.rows[0].id, status: prior.rows[0].status });
-    }
+    };
+    const prior = await replay();
+    if (prior !== undefined) return prior;
 
     const jobId = randomUUID(); const startedAt = Date.now();
-    await database.query(`INSERT INTO ai_generation_jobs (id,organization_id,requested_by,kind,provider,model,prompt_version,status,idempotency_key,input_json)
-      VALUES ($1,$2,$3,'outline',$4,$5,'outline-v1','running',$6,$7::jsonb)`, [jobId, user.organizationId, user.id, provider.name, provider.model, body.idempotencyKey, JSON.stringify(body)]);
+    const claimed = await database.query(`INSERT INTO ai_generation_jobs (id,organization_id,requested_by,kind,provider,model,prompt_version,status,idempotency_key,input_json)
+      VALUES ($1,$2,$3,'outline',$4,$5,'outline-v1','running',$6,$7::jsonb)
+      ON CONFLICT (organization_id,idempotency_key) DO NOTHING RETURNING id`, [jobId, user.organizationId, user.id, provider.name, provider.model, body.idempotencyKey, JSON.stringify(body)]);
+    if (!claimed.rows.length) return replay();
     try {
       const contextResult = await database.query<ApprovedJumpContext>(`SELECT c.id,c.title,v.body_json->>'text' AS text,v.source_label AS "sourceLabel",v.source_url AS "sourceUrl"
         FROM jump_contents c JOIN jump_content_versions v ON v.id=c.current_version_id AND v.content_id=c.id
@@ -85,29 +92,43 @@ export function registerAiRoutes(app: FastifyInstance, database: Database, provi
   app.post("/api/v1/ai/outlines/:id/presentation", async (request, reply) => {
     const user = await authenticate(request, database); requireWrite(user); const { id } = request.params as { id: string };
     const body = GeneratePresentationFromOutlineSchema.parse(request.body);
-    const prior = await database.query<JobRow>("SELECT id,status,output_json AS output,error_json AS error FROM ai_generation_jobs WHERE organization_id=$1 AND idempotency_key=$2", [user.organizationId, body.idempotencyKey]);
-    if (prior.rows[0]) {
+    const input = { outlineId: id, provider: body.provider };
+    const replay = async () => {
+      const prior = await database.query<JobRow>("SELECT id,status,kind,outline_id AS \"outlineId\",input_json=$3::jsonb AS \"inputMatches\",output_json AS output FROM ai_generation_jobs WHERE organization_id=$1 AND idempotency_key=$2", [user.organizationId, body.idempotencyKey, JSON.stringify(input)]);
+      if (!prior.rows[0]) return undefined;
+      if (prior.rows[0].kind !== "presentation" || prior.rows[0].outlineId !== id || !prior.rows[0].inputMatches) throw new AppError(409, "AI_IDEMPOTENCY_CONFLICT", "Esta chave de idempotência já foi usada para outra solicitação de IA.", { jobId: prior.rows[0].id });
       if (prior.rows[0].status === "succeeded") return prior.rows[0].output;
       throw new AppError(409, "AI_IDEMPOTENCY_CONFLICT", "Esta solicitação de IA já foi processada ou ainda está em andamento.", { jobId: prior.rows[0].id, status: prior.rows[0].status });
-    }
+    };
+    const prior = await replay();
+    if (prior !== undefined) return prior;
     const outlineResult = await database.query<OutlineRow>(`${outlineSelect} WHERE id=$1 AND organization_id=$2`, [id, user.organizationId]);
     if (!outlineResult.rows[0]) throw notFound("Roteiro");
     const outline = parseOutline(outlineResult.rows[0]);
     if (outline.status !== "approved") throw new AppError(409, "OUTLINE_NOT_APPROVED", "Aprove o roteiro antes de gerar os slides.");
     const jobId = randomUUID(); const startedAt = Date.now();
-    await database.query(`INSERT INTO ai_generation_jobs (id,organization_id,requested_by,outline_id,kind,provider,model,prompt_version,status,idempotency_key,input_json)
-      VALUES ($1,$2,$3,$4,'presentation',$5,$6,'presentation-v1','running',$7,$8::jsonb)`, [jobId, user.organizationId, user.id, id, provider.name, provider.model, body.idempotencyKey, JSON.stringify({ outlineId: id, provider: body.provider })]);
+    const claimed = await database.query(`INSERT INTO ai_generation_jobs (id,organization_id,requested_by,outline_id,kind,provider,model,prompt_version,status,idempotency_key,input_json)
+      VALUES ($1,$2,$3,$4,'presentation',$5,$6,'presentation-v1','running',$7,$8::jsonb)
+      ON CONFLICT (organization_id,idempotency_key) DO NOTHING RETURNING id`, [jobId, user.organizationId, user.id, id, provider.name, provider.model, body.idempotencyKey, JSON.stringify(input)]);
+    if (!claimed.rows.length) return replay();
     try {
-      const contextResult = await database.query<ApprovedJumpContext>(`SELECT c.id,c.title,v.body_json->>'text' AS text,v.source_label AS "sourceLabel",v.source_url AS "sourceUrl"
+      const contextResult = await database.query<VersionedJumpContext>(`SELECT c.id,v.id AS "versionId",c.title,v.body_json->>'text' AS text,v.source_label AS "sourceLabel",v.source_url AS "sourceUrl"
         FROM jump_contents c JOIN jump_content_versions v ON v.id=c.current_version_id AND v.content_id=c.id
         WHERE c.organization_id=$1 AND c.status='approved' AND c.current_version_id=c.approved_version_id AND v.source_label<>''
           AND (v.valid_from IS NULL OR v.valid_from<=CURRENT_DATE) AND (v.valid_until IS NULL OR v.valid_until>=CURRENT_DATE)
         ORDER BY c.updated_at DESC LIMIT 50`, [user.organizationId]);
-      const generated = await provider.generatePresentation(outline, contextResult.rows);
+      const providerContext: ApprovedJumpContext[] = contextResult.rows.map(({ versionId: _versionId, ...source }) => source);
+      const generated = await provider.generatePresentation(outline, providerContext);
+      validatePresentationEvidence(generated, outline, providerContext);
+      const approvedVersions = new Map(contextResult.rows.map(item => [item.id, item.versionId]));
       const theme = await database.query<{ id: string }>("SELECT id FROM themes WHERE organization_id=$1 AND is_default=true LIMIT 1", [user.organizationId]);
       if (!theme.rows[0]) throw new AppError(409, "DEFAULT_THEME_MISSING", "A organização não possui tema padrão.");
       const content = PresentationContentSchema.parse({ schemaVersion: "1.0", canvas: { width: 1920, height: 1080, ratio: "16:9" }, themeId: theme.rows[0].id,
-        slides: generated.slides.map(slide => ({ slideId: randomUUID(), layout: slide.layout, references: slide.referenceIds,
+        slides: generated.slides.map(slide => ({ slideId: randomUUID(), layout: slide.layout, references: slide.referenceIds.map(referenceId => {
+          const sourceVersionId = approvedVersions.get(referenceId);
+          if (!sourceVersionId) throw new AiProviderError("AI_REFERENCE_NOT_ALLOWED", "A IA informou uma referência não aprovada.", false);
+          return sourceVersionId;
+        }),
           blocks: slide.blocks.map(block => ({ ...block, id: randomUUID() })) })) });
       const presentationId = randomUUID(), versionId = randomUUID(), mutationId = randomUUID();
       const response = { job: { id: jobId, status: "succeeded", provider: provider.name, model: provider.model, durationMs: Date.now() - startedAt }, presentation: { id: presentationId, title: outline.title, versionId } };
@@ -188,25 +209,30 @@ export function registerAiRoutes(app: FastifyInstance, database: Database, provi
             item.id === block.id ? { ...block, text } : item
           );
         } else {
-          const contextResult = await database.query<ApprovedJumpContext>(`SELECT c.id,c.title,v.body_json->>'text' AS text,v.source_label AS "sourceLabel",v.source_url AS "sourceUrl"
+          const contextResult = await database.query<VersionedJumpContext>(`SELECT c.id,v.id AS "versionId",c.title,v.body_json->>'text' AS text,v.source_label AS "sourceLabel",v.source_url AS "sourceUrl"
             FROM jump_contents c JOIN jump_content_versions v ON v.id=c.current_version_id AND v.content_id=c.id
             WHERE c.organization_id=$1 AND c.status='approved' AND c.current_version_id=c.approved_version_id AND v.source_label<>''
               AND (v.valid_from IS NULL OR v.valid_from<=CURRENT_DATE) AND (v.valid_until IS NULL OR v.valid_until>=CURRENT_DATE)
             ORDER BY c.updated_at DESC LIMIT 50`, [user.organizationId]);
-          const generated = await provider.regenerateSlide(currentSlide, body.instruction, contextResult.rows);
+          const providerContext: ApprovedJumpContext[] = contextResult.rows.map(({ versionId: _versionId, ...source }) => source);
+          const approvedVersions = new Map(contextResult.rows.map(item => [item.id, item.versionId]));
+          const currentContentIds = new Map(contextResult.rows.map(item => [item.versionId, item.id]));
+          const providerSlide = { ...currentSlide, references: currentSlide.references.flatMap(referenceId => {
+            const contentId = currentContentIds.get(referenceId) ?? (approvedVersions.has(referenceId) ? referenceId : undefined);
+            return contentId ? [contentId] : [];
+          }) };
+          const generated = await provider.regenerateSlide(providerSlide, body.instruction, providerContext);
           usage = generated.usage;
-          const allowedReferences = new Set(contextResult.rows.map(item => item.id));
-          if (generated.referenceIds.some(reference => !allowedReferences.has(reference))) {
-            throw new AiProviderError("AI_REFERENCE_NOT_ALLOWED", "A IA informou uma referência não aprovada.", false);
-          }
           const isTitle = (block: { type: string; role: string }) => block.type === "text" && block.role === "title";
           const titles = currentSlide.blocks.filter(isTitle);
           const images = currentSlide.blocks.filter(block => block.type === "image");
           const generatedBlocks = titles.length ? generated.blocks.filter(block => !isTitle(block)) : generated.blocks;
+          const finalBlocks = [...titles, ...generatedBlocks.map(block => ({ ...block, id: randomUUID() })), ...images];
+          validateGeneratedSlideEvidence({ blocks: finalBlocks, referenceIds: generated.referenceIds }, providerContext);
           nextContent.slides[slideIndex] = {
             ...currentSlide,
-            blocks: [...titles, ...generatedBlocks.map(block => ({ ...block, id: randomUUID() })), ...images],
-            references: [...new Set(generated.referenceIds)]
+            blocks: finalBlocks,
+            references: [...new Set(generated.referenceIds.map(referenceId => approvedVersions.get(referenceId)!))]
           };
         }
         const validContent = PresentationContentSchema.parse(nextContent); const mutationId = randomUUID();

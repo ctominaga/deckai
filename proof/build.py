@@ -20,6 +20,7 @@ PROOF = Path(__file__).resolve().parent
 SOURCE = ROOT / "examples" / "presentation.example.json"
 OUTPUT = PROOF / "dist" / "deck.html"
 SITE_OUTPUT = ROOT / "preview-dev3" / "editor-dev2.html"
+WEB_OUTPUT = ROOT / "apps" / "web" / "public" / "editor-dev2.html"
 
 EXPECTED_SLOTS = {
     "cover": {"title", "subtitle", "image"},
@@ -185,7 +186,7 @@ def build() -> None:
     scanner.feed(html)
     if scanner.errors:
         fail("; ".join(scanner.errors))
-    for output in (OUTPUT, SITE_OUTPUT):
+    for output in (OUTPUT, SITE_OUTPUT, WEB_OUTPUT):
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(html, encoding="utf-8")
         print(f"Built {output.relative_to(ROOT)}: 6 layouts, {len(data['assets'])} inlined assets, {output.stat().st_size:,} bytes")
