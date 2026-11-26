@@ -36,14 +36,20 @@ export function registerAiRoutes(app: FastifyInstance, database: Database, provi
       ON CONFLICT (organization_id,idempotency_key) DO NOTHING RETURNING id`, [jobId, user.organizationId, user.id, provider.name, provider.model, body.idempotencyKey, JSON.stringify(body)]);
     if (!claimed.rows.length) return replay();
     try {
-      const contextResult = await database.query<ApprovedJumpContext>(`SELECT c.id,c.title,v.body_json->>'text' AS text,v.source_label AS "sourceLabel",v.source_url AS "sourceUrl"
+      const contextResult = await database.query<VersionedJumpContext>(`SELECT c.id,v.id AS "versionId",c.title,v.body_json->>'text' AS text,v.source_label AS "sourceLabel",v.source_url AS "sourceUrl"
         FROM jump_contents c JOIN jump_content_versions v ON v.id=c.current_version_id AND v.content_id=c.id
         WHERE c.organization_id=$1 AND c.status='approved' AND c.current_version_id=c.approved_version_id AND v.source_label<>''
           AND (v.valid_from IS NULL OR v.valid_from<=CURRENT_DATE) AND (v.valid_until IS NULL OR v.valid_until>=CURRENT_DATE)
         ORDER BY c.updated_at DESC LIMIT 50`, [user.organizationId]);
-      const generated = await provider.generateOutline(body.briefing, contextResult.rows);
+      const providerContext: ApprovedJumpContext[] = contextResult.rows.map(({ versionId: _versionId, ...source }) => source);
+      const generated = await provider.generateOutline(body.briefing, providerContext);
+      const approvedVersions = new Map(contextResult.rows.map(source => [source.id, source.versionId]));
       const outline = AiOutlineSchema.parse({ id: randomUUID(), title: generated.title, status: "draft", revision: 1, briefing: body.briefing,
-        slides: generated.slides.map(slide => ({ ...slide, id: randomUUID() })) });
+        slides: generated.slides.map(slide => ({ ...slide, id: randomUUID(), referenceIds: slide.referenceIds.map(contentId => {
+          const versionId = approvedVersions.get(contentId);
+          if (!versionId) throw new AiProviderError("AI_REFERENCE_NOT_ALLOWED", "A IA informou uma referência não aprovada.", false);
+          return versionId;
+        }) })) });
       const response = { job: { id: jobId, status: "succeeded", provider: provider.name, model: provider.model, durationMs: Date.now() - startedAt }, outline };
       await database.transaction(async (tx) => {
         await tx.query(`INSERT INTO presentation_outlines (id,organization_id,title,briefing_json,slides_json,created_by)
@@ -118,8 +124,16 @@ export function registerAiRoutes(app: FastifyInstance, database: Database, provi
           AND (v.valid_from IS NULL OR v.valid_from<=CURRENT_DATE) AND (v.valid_until IS NULL OR v.valid_until>=CURRENT_DATE)
         ORDER BY c.updated_at DESC LIMIT 50`, [user.organizationId]);
       const providerContext: ApprovedJumpContext[] = contextResult.rows.map(({ versionId: _versionId, ...source }) => source);
-      const generated = await provider.generatePresentation(outline, providerContext);
-      validatePresentationEvidence(generated, outline, providerContext);
+      const approvedByVersion = new Map(contextResult.rows.map(source => [source.versionId, source.id]));
+      const providerOutline = AiOutlineSchema.parse({ ...outline, slides: outline.slides.map(slide => ({ ...slide,
+        referenceIds: slide.referenceIds.map(versionId => {
+          const contentId = approvedByVersion.get(versionId);
+          if (!contentId) throw new AppError(409, "OUTLINE_SOURCE_CHANGED", "Uma fonte do roteiro foi alterada ou perdeu a aprovação. Gere um novo roteiro.");
+          return contentId;
+        })
+      })) });
+      const generated = await provider.generatePresentation(providerOutline, providerContext);
+      validatePresentationEvidence(generated, providerOutline, providerContext);
       const approvedVersions = new Map(contextResult.rows.map(item => [item.id, item.versionId]));
       const theme = await database.query<{ id: string }>("SELECT id FROM themes WHERE organization_id=$1 AND is_default=true LIMIT 1", [user.organizationId]);
       if (!theme.rows[0]) throw new AppError(409, "DEFAULT_THEME_MISSING", "A organização não possui tema padrão.");

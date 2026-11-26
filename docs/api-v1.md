@@ -225,7 +225,9 @@ Aprova um roteiro em rascunho usando controle otimista por `expectedRevision`. A
 
 Desenvolve os slides de um roteiro aprovado, valida quantidade, ordem, layouts, títulos e referências e persiste uma apresentação canônica com versão inicial e rascunho editável. A solicitação exige uma nova `idempotencyKey`; repeti-la retorna a mesma apresentação sem nova chamada ao provedor.
 
-Slides com texto institucional ou métricas precisam de referências aprovadas. Na apresentação persistida, `slides[].references` guarda os IDs das **versões imutáveis** dos conteúdos Jump usados; o roteiro e a resposta do provedor ainda identificam os conteúdos por seus IDs. Editar um conteúdo Jump depois da geração não altera a versão de fonte registrada no slide.
+Slides com texto institucional ou métricas precisam de referências aprovadas. O roteiro persistido guarda em `slides[].referenceIds` os IDs das **versões imutáveis** dos conteúdos Jump usados; a apresentação faz o mesmo em `slides[].references`. O provedor recebe os IDs dos conteúdos apenas durante a chamada. Se uma fonte do roteiro for editada e reaprovada antes da geração da apresentação, a API exige um novo roteiro em vez de atribuir os fatos antigos à versão nova. Editar uma fonte depois da geração não altera a versão registrada no slide.
+
+Roteiros criados pela implementação anterior, que guardava IDs dos conteúdos, também precisam ser gerados novamente antes de desenvolver os slides.
 
 ### `POST /api/v1/presentations/:id/slides/:slideId/regenerate`
 

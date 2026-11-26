@@ -251,6 +251,43 @@ describe("biblioteca Jump", () => {
 });
 
 describe("geracao de roteiro por IA", () => {
+  it("prende o roteiro à versão aprovada da fonte e rejeita reaprovacão de outra versão", async () => {
+    let presentationCalls = 0;
+    const provider: OutlineProvider = { name: "deepseek", model: "deepseek-test", ...unusedProviderMethods,
+      async generateOutline(briefing, context) { return { title: briefing.objective, slides: [{
+        title: "Serviço Jump", objective: "Apresentar o serviço", layout: "cover", keyPoints: ["Fato aprovado"], referenceIds: [context[0]!.id]
+      }] }; },
+      async generatePresentation() { presentationCalls++; throw new Error("A fonte alterada não deve chegar ao provedor."); }
+    };
+    const { app, database } = await setup(provider);
+    const authorization = await bootstrapAndLogin(app);
+    const source = { kind: "service", title: "Serviço Jump", text: "Serviço original aprovado.", sourceLabel: "Fonte interna", validFrom: "2020-01-01", validUntil: "2099-12-31", tags: ["serviço"] };
+    const created = await app.inject({ method: "POST", url: "/api/v1/jump-contents", headers: { authorization }, payload: source });
+    expect(created.statusCode).toBe(201);
+    const contentId = created.json().id as string;
+    const originalVersionId = created.json().currentVersionId as string;
+    expect((await app.inject({ method: "POST", url: `/api/v1/jump-contents/${contentId}/submit`, headers: { authorization }, payload: {} })).statusCode).toBe(200);
+    expect((await app.inject({ method: "POST", url: `/api/v1/jump-contents/${contentId}/approve`, headers: { authorization }, payload: {} })).statusCode).toBe(200);
+    const generated = await app.inject({ method: "POST", url: "/api/v1/ai/outlines", headers: { authorization }, payload: {
+      idempotencyKey: randomUUID(), provider: "deepseek", briefing: { prompt: "Crie proposta", objective: "Proposta", audience: "Diretoria", tone: "consultivo", language: "pt-BR", slideCount: 1 }
+    } });
+    expect(generated.statusCode).toBe(201);
+    expect(generated.json().outline.slides[0].referenceIds).toEqual([originalVersionId]);
+    const outlineId = generated.json().outline.id as string;
+    expect((await app.inject({ method: "POST", url: `/api/v1/ai/outlines/${outlineId}/approve`, headers: { authorization }, payload: { expectedRevision: 1 } })).statusCode).toBe(200);
+    const changed = await app.inject({ method: "PUT", url: `/api/v1/jump-contents/${contentId}`, headers: { authorization }, payload: { ...source, text: "Serviço atualizado e reaprovado." } });
+    expect(changed.statusCode).toBe(200);
+    expect(changed.json().currentVersionId).not.toBe(originalVersionId);
+    expect((await app.inject({ method: "POST", url: `/api/v1/jump-contents/${contentId}/submit`, headers: { authorization }, payload: {} })).statusCode).toBe(200);
+    expect((await app.inject({ method: "POST", url: `/api/v1/jump-contents/${contentId}/approve`, headers: { authorization }, payload: {} })).statusCode).toBe(200);
+    const rejected = await app.inject({ method: "POST", url: `/api/v1/ai/outlines/${outlineId}/presentation`, headers: { authorization }, payload: { idempotencyKey: randomUUID(), provider: "deepseek" } });
+    expect(rejected.statusCode).toBe(409);
+    expect(rejected.json().error.code).toBe("OUTLINE_SOURCE_CHANGED");
+    expect(presentationCalls).toBe(0);
+    const presentations = await database.query<{ count: number }>("SELECT count(*)::int AS count FROM presentations");
+    expect(presentations.rows[0]?.count).toBe(0);
+  });
+
   it("serializa pedidos simultâneos com a mesma chave de idempotência", async () => {
     let calls = 0;
     const provider: OutlineProvider = { name: "deepseek", model: "deepseek-test", ...unusedProviderMethods, async generateOutline(briefing) {
