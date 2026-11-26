@@ -6,6 +6,8 @@ import { createMemoryDatabase, type Database } from "./database.js";
 import { runMigrations } from "./migrations.js";
 import { hashPassword } from "./security.js";
 import type { OutlineProvider } from "./ai-provider.js";
+import { processNextExport } from "./export-worker.js";
+import { renderPptx } from "./pptx-renderer.js";
 
 const resources: Array<{ app: Awaited<ReturnType<typeof buildApp>>; database: Database }> = [];
 afterEach(async () => { while (resources.length) { const item = resources.pop()!; await item.app.close(); await item.database.close(); } });
@@ -509,5 +511,37 @@ describe("fila de exportação PDF", () => {
     expect(incompatible.json().error.code).toBe("EXPORT_IDEMPOTENCY_CONFLICT");
     const missing = await app.inject({ method: "POST", url, headers, payload: { versionId: randomUUID(), idempotencyKey: randomUUID() } });
     expect(missing.statusCode).toBe(404);
+
+    const downloadUrl = statusUrl + "/download";
+    expect((await app.inject({ method: "GET", url: downloadUrl, headers })).statusCode).toBe(409);
+    expect((await app.inject({ method: "GET", url: downloadUrl })).statusCode).toBe(401);
+    await processNextExport(database, "pdf", async () => { throw new Error("Renderer indisponível"); });
+    expect((await app.inject({ method: "GET", url: statusUrl, headers })).json().job).toMatchObject({ status: "retrying", attempt: 1 });
+
+    // Simula um processo interrompido na segunda tentativa.
+    await database.query("UPDATE export_jobs SET status='running',attempt=2,locked_until=now()-interval '1 second' WHERE id=$1", [job.id]);
+    const fixture = Buffer.from("%PDF-1.7 test fixture");
+    const processors = await Promise.all([
+      processNextExport(database, "pdf", async () => fixture),
+      processNextExport(database, "pdf", async () => fixture)
+    ]);
+    expect(processors.sort()).toEqual([false, true]);
+    expect((await app.inject({ method: "GET", url: statusUrl, headers })).json().job).toMatchObject({ status: "succeeded", attempt: 3 });
+    const download = await app.inject({ method: "GET", url: downloadUrl, headers });
+    expect(download.statusCode).toBe(200);
+    expect(download.headers["content-type"]).toBe("application/pdf");
+    expect(download.headers["cache-control"]).toBe("private, no-store");
+    expect(download.rawPayload).toEqual(fixture);
+
+    const pptxRequest = await app.inject({
+      method: "POST", url: `/api/v1/presentations/${presentationId}/exports/pptx`, headers,
+      payload: { versionId, idempotencyKey: randomUUID() }
+    });
+    expect(pptxRequest.statusCode).toBe(202);
+    expect(await processNextExport(database, "pptx", renderPptx)).toBe(true);
+    const pptxDownload = await app.inject({ method: "GET", url: `/api/v1/exports/${pptxRequest.json().job.id}/download`, headers });
+    expect(pptxDownload.statusCode).toBe(200);
+    expect(pptxDownload.headers["content-disposition"]).toMatch(/\.pptx"$/);
+    expect(pptxDownload.rawPayload.subarray(0, 4)).toEqual(Buffer.from([0x50, 0x4b, 3, 4]));
   });
 });
