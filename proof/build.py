@@ -20,6 +20,8 @@ PROOF = Path(__file__).resolve().parent
 SOURCE = ROOT / "examples" / "presentation.example.json"
 OUTPUT = PROOF / "dist" / "deck.html"
 SITE_OUTPUT = ROOT / "preview-dev3" / "editor-dev2.html"
+WEB_OUTPUT = ROOT / "apps" / "web" / "public" / "editor-dev2.html"
+HOSTED_OUTPUT = ROOT / "dist" / "editor-dev2.html"
 
 EXPECTED_SLOTS = {
     "cover": {"title", "subtitle", "image"},
@@ -108,6 +110,8 @@ def validate_and_inline(data: dict) -> None:
             fail(f"Missing asset {asset_id}: {path}")
         content = path.read_bytes()
         if asset["mimeType"] == "image/svg+xml":
+            # Git may check out SVG text with CRLF on Windows; embed stable bytes.
+            content = content.replace(b"\r\n", b"\n")
             svg = content.decode("utf-8")
             svg_without_namespace = svg.replace('http://www.w3.org/2000/svg', '').replace('http://www.w3.org/1999/xlink', '')
             if EXTERNAL_REFERENCE.search(svg_without_namespace):
@@ -185,7 +189,7 @@ def build() -> None:
     scanner.feed(html)
     if scanner.errors:
         fail("; ".join(scanner.errors))
-    for output in (OUTPUT, SITE_OUTPUT):
+    for output in (OUTPUT, SITE_OUTPUT, WEB_OUTPUT, HOSTED_OUTPUT):
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(html, encoding="utf-8")
         print(f"Built {output.relative_to(ROOT)}: 6 layouts, {len(data['assets'])} inlined assets, {output.stat().st_size:,} bytes")

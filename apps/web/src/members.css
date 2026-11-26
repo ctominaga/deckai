@@ -53,6 +53,7 @@
 .kind-chip,
 .tag-list span { display: inline-block; border: 1px solid var(--line); padding: 4px 7px; margin-right: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
 .status-approved { background: #dff6de; }
+.status-scheduled { background: #dbeefa; }
 .status-expired,
 .status-rejected { background: #ffe2df; }
 .status-in_review { background: #fff2b8; }

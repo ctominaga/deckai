@@ -24,6 +24,8 @@ Senha: DeckAI-dev-2026
 
 O seed é exclusivo de desenvolvimento e recusa execução com `NODE_ENV=production`.
 
+A aplicação oferece um link para a prova visual do editor do Dev 2 em `/editor-dev2.html`. A página é uma demonstração independente com dados sintéticos; ainda não usa o schema `1.0` nem salva apresentações pela API. `py -3 proof/build.py` atualiza o HTML servido pela aplicação, pela prévia legada e pela prévia estática em `dist/`.
+
 Validação completa:
 
 ```powershell
@@ -98,7 +100,7 @@ Na raiz do repositório, gere novamente a página autônoma após alterar a prov
 py -3 proof/build.py
 ```
 
-O build também atualiza `preview-dev3/editor-dev2.html`. Com o servidor da seção anterior, abra `http://localhost:5173/editor-dev2.html` ou use o link na visão geral e no protótipo. A prova mostra seis layouts 16:9, edição local de textos e métricas, miniaturas, apresentação, exportação HTML e impressão. O arquivo `proof/dist/deck.html` pode ser aberto offline.
+O build também atualiza `preview-dev3/editor-dev2.html` e `dist/editor-dev2.html`. Com o servidor da seção anterior, abra `http://localhost:5173/editor-dev2.html` ou use o link na visão geral e no protótipo. A prova mostra seis layouts 16:9, edição local de textos e métricas, miniaturas, apresentação, exportação HTML e impressão. O arquivo `proof/dist/deck.html` pode ser aberto offline.
 
 Esta é uma demonstração independente com conteúdo sintético e contrato JSON provisório. Ela ainda não lê apresentações da API ou do armazenamento local do Dev 3, nem gera PDF ou PPTX. Consulte [a documentação da prova](proof/README.md) para testar e conhecer os limites.
 

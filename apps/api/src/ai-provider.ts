@@ -48,6 +48,47 @@ export class AiProviderError extends Error {
   constructor(public readonly code: string, message: string, public readonly retryable: boolean, public readonly status = 502) { super(message); }
 }
 
+// A reference is attached to the whole slide. Without one, only a short set of
+// generic labels, questions and explicit placeholders can be rendered. This
+// conservative rule prevents an uncited statement from turning into a
+// published institutional claim, including with a custom provider.
+const sourceFreePlaceholder = /^(?:informa[cç][aã]o|dados|conte[uú]do|n[uú]meros?) a confirmar[.!]?$/i;
+const sourceFreeText = new Set([
+  "nossa proposta", "proposta executiva", "agenda", "sumário", "introdução", "visão geral", "objetivos",
+  "próximos passos", "resultados esperados", "conclusão", "contato", "perguntas", "obrigado", "obrigada",
+  "vamos conversar", "entre em contato", "saiba mais", "fale conosco", "agende uma conversa",
+  "como podemos ajudar?", "quais resultados você espera?", "o que você deseja alcançar?"
+]);
+
+export function validateGeneratedSlideEvidence(
+  slide: { blocks: ReadonlyArray<{ type: "text"; text: string } | { type: "metric" } | { type: "image" }>; referenceIds: readonly string[] },
+  context: ApprovedJumpContext[],
+  requiredReferenceIds: readonly string[] = [],
+  slideNumber = 1
+): void {
+  const allowedReferenceIds = new Set(context.map(item => item.id));
+  for (const referenceId of slide.referenceIds) {
+    if (!allowedReferenceIds.has(referenceId)) throw new AiProviderError("AI_REFERENCE_NOT_ALLOWED", "A IA informou uma referência não aprovada.", false);
+  }
+  for (const referenceId of requiredReferenceIds) {
+    if (!slide.referenceIds.includes(referenceId)) throw new AiProviderError("AI_CLAIM_WITHOUT_REFERENCE", `O slide ${slideNumber} perdeu uma referência do roteiro aprovado.`, true);
+  }
+  if (slide.referenceIds.length) return;
+  for (const block of slide.blocks) {
+    if (block.type === "image") continue;
+    if (block.type === "metric") throw new AiProviderError("AI_CLAIM_WITHOUT_REFERENCE", `O slide ${slideNumber} contém uma métrica sem referência.`, true);
+    const text = block.text.trim();
+    if (sourceFreePlaceholder.test(text) || sourceFreeText.has(text.toLocaleLowerCase("pt-BR"))) continue;
+    throw new AiProviderError("AI_CLAIM_WITHOUT_REFERENCE", `O slide ${slideNumber} contém texto sem referência.`, true);
+  }
+}
+
+export function validatePresentationEvidence(generated: ProviderPresentation, outline: AiOutline, context: ApprovedJumpContext[]): void {
+  generated.slides.forEach((slide, index) =>
+    validateGeneratedSlideEvidence(slide, context, outline.slides[index]?.referenceIds ?? [], index + 1)
+  );
+}
+
 export class DeepSeekOutlineProvider implements OutlineProvider {
   readonly name = "deepseek" as const;
   readonly model: string;
@@ -96,7 +137,6 @@ export class DeepSeekOutlineProvider implements OutlineProvider {
     if (process.env.DECKAI_ENABLE_REAL_DEEPSEEK !== "true") throw new AiProviderError("AI_DISABLED", "DeepSeek está desativado no backend.", false, 503);
     if (!this.apiKey.trim()) throw new AiProviderError("AI_KEY_MISSING", "A chave do DeepSeek não está configurada no backend.", false, 503);
     if (outline.status !== "approved") throw new AiProviderError("OUTLINE_NOT_APPROVED", "O roteiro precisa estar aprovado.", false, 409);
-    const allowedReferenceIds = new Set(context.map(item => item.id));
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
       const response = await this.transport(this.endpoint, { method: "POST", redirect: "error", signal: controller.signal, headers: { "content-type": "application/json", authorization: `Bearer ${this.apiKey}` }, body: JSON.stringify({
@@ -114,8 +154,8 @@ export class DeepSeekOutlineProvider implements OutlineProvider {
       parsed.slides.forEach((slide, index) => {
         const planned = outline.slides[index]!; const title = slide.blocks[0];
         if (slide.layout !== planned.layout || title?.type !== "text" || title.role !== "title" || title.text !== planned.title) throw new AiProviderError("AI_OUTLINE_MISMATCH", `A IA divergiu do roteiro no slide ${index + 1}.`, true);
-        for (const referenceId of slide.referenceIds) if (!allowedReferenceIds.has(referenceId)) throw new AiProviderError("AI_REFERENCE_NOT_ALLOWED", "A IA informou uma referência não aprovada.", false);
       });
+      validatePresentationEvidence(parsed, outline, context);
       return { ...parsed, usage: envelope.usage };
     } catch (error) {
       if (controller.signal.aborted) throw new AiProviderError("AI_TIMEOUT", "O DeepSeek excedeu o tempo limite.", true, 504);

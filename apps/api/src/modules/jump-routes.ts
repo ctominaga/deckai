@@ -24,7 +24,9 @@ const publicExamples = [
 ] as const;
 
 const contentSelect = `SELECT c.id,c.organization_id AS "organizationId",c.kind,c.title,c.status,
-  CASE WHEN c.status='approved' AND ((v.valid_from IS NOT NULL AND v.valid_from>CURRENT_DATE) OR (v.valid_until IS NOT NULL AND v.valid_until<CURRENT_DATE)) THEN 'expired' ELSE c.status END AS "effectiveStatus",
+  CASE WHEN c.status='approved' AND v.valid_from IS NOT NULL AND v.valid_from>CURRENT_DATE THEN 'scheduled'
+       WHEN c.status='approved' AND v.valid_until IS NOT NULL AND v.valid_until<CURRENT_DATE THEN 'expired'
+       ELSE c.status END AS "effectiveStatus",
   c.current_version_id AS "currentVersionId",c.approved_version_id AS "approvedVersionId",v.version_number AS "versionNumber",
   v.body_json->>'text' AS text,v.source_label AS "sourceLabel",v.source_url AS "sourceUrl",v.source_locator AS "sourceLocator",
   v.valid_from::text AS "validFrom",v.valid_until::text AS "validUntil",v.tags,c.created_by AS "createdBy",

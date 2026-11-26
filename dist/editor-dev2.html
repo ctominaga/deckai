@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Prova técnica offline do editor HTML do Deck AI com conteúdo neutro provisório.">
+  <title>Deck AI · prova HTML offline</title>
+  <style>:root {
+  --ui-ink: #182535;
+  --ui-muted: #647385;
+  --ui-line: #dce3e9;
+  --ui-bg: #f3f5f7;
+  --ui-surface: #ffffff;
+  --ui-accent: #245f60;
+  --deck-bg: #f8f6f2;
+  --deck-surface: #ffffff;
+  --deck-ink: #172d38;
+  --deck-accent: #276f68;
+  --deck-muted: #63767a;
+  --deck-heading-font: Arial, Helvetica, sans-serif;
+  --deck-body-font: Arial, Helvetica, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--ui-bg); color: var(--ui-ink); font-family: Inter, "Segoe UI", Arial, sans-serif; }
+button { font: inherit; cursor: pointer; }
+button:focus-visible, [contenteditable]:focus-visible, a:focus-visible { outline: 3px solid #368b82; outline-offset: 3px; }
+button:disabled { opacity: .38; cursor: not-allowed; }
+.skip-link { position: fixed; top: -60px; left: 16px; z-index: 200; padding: 10px 14px; background: #fff; color: #173535; border-radius: 8px; }
+.skip-link:focus { top: 10px; }
+
+.app-shell { min-height: 100vh; }
+.topbar { display: flex; align-items: center; gap: 24px; min-height: 82px; padding: 14px 28px; background: #fff; border-bottom: 1px solid var(--ui-line); }
+.brand { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; font-size: 20px; letter-spacing: -.06em; font-weight: 750; white-space: nowrap; }
+.brand strong { color: var(--ui-accent); }
+.brand-mark { display: flex; align-items: flex-end; gap: 2px; width: 25px; height: 25px; padding: 4px; background: #16494b; border-radius: 7px; }
+.brand-mark span { display: block; width: 5px; border-radius: 2px 2px 0 0; background: #d8f0e9; }
+.brand-mark span:nth-child(1) { height: 8px; }.brand-mark span:nth-child(2) { height: 14px; }.brand-mark span:nth-child(3) { height: 11px; }
+.deck-heading { min-width: 0; padding-left: 23px; border-left: 1px solid var(--ui-line); }
+.deck-title { max-width: 440px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 14px; font-weight: 700; }
+.demo-label { margin-top: 5px; color: #687888; font-size: 10px; font-weight: 800; letter-spacing: .11em; }
+.top-actions { display: flex; align-items: center; gap: 9px; margin-left: auto; }
+.button { display: inline-flex; justify-content: center; align-items: center; gap: 12px; min-height: 38px; padding: 8px 15px; border-radius: 9px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.button-secondary { color: #254247; background: #fff; border: 1px solid #cbd7db; }
+.button-secondary:hover { background: #f1f7f5; }
+.button-primary { background: #194e50; color: white; border: 1px solid #194e50; }
+.button-primary:hover { background: #236665; }
+
+.workspace { display: grid; grid-template-columns: 254px minmax(0, 1fr); min-height: calc(100vh - 82px); }
+.sidebar { display: flex; flex-direction: column; min-width: 0; padding: 27px 16px 22px; background: #fff; border-right: 1px solid var(--ui-line); }
+.side-heading { display: flex; align-items: center; justify-content: space-between; margin: 0 5px 18px; }
+.side-heading h2 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .105em; }
+.count { display: grid; place-items: center; min-width: 24px; height: 23px; padding: 0 6px; border-radius: 6px; color: #516577; background: #eff3f6; font-size: 11px; font-weight: 800; }
+.slide-list { display: flex; flex-direction: column; gap: 14px; }
+.thumb-button { display: block; width: 100%; margin: 0; padding: 8px; text-align: left; background: transparent; border: 1.5px solid transparent; border-radius: 12px; color: inherit; }
+.thumb-button:hover { background: #f2f6f6; }
+.thumb-button[aria-current="true"] { background: #eef5f2; border-color: #388078; box-shadow: 0 0 0 2px #e1efeb; }
+.thumbnail-viewport { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 5px; background: #eee; box-shadow: 0 2px 10px #162d3c20; }
+.thumbnail-viewport > .slide-canvas { position: absolute; left: 0; top: 0; width: 960px; height: 540px; transform: scale(var(--thumb-scale, .2)); transform-origin: top left; }
+.thumbnail-title { display: flex; align-items: baseline; gap: 8px; margin: 9px 2px 1px; font-size: 12px; font-weight: 700; line-height: 1.3; }
+.thumbnail-number { color: #7d8c95; font-size: 11px; font-variant-numeric: tabular-nums; }
+.thumbnail-title > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-note { display: flex; align-items: flex-start; gap: 7px; margin: auto 6px 0; padding-top: 25px; color: #6a7a88; font-size: 11px; line-height: 1.45; }
+.note-dot { display: block; flex: 0 0 auto; width: 7px; height: 7px; margin-top: 4px; border-radius: 50%; background: #d19241; }
+
+.editor { min-width: 0; width: 100%; max-width: 1270px; margin: 0 auto; padding: 32px 5.2vw 25px; }
+.editor-topline { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 19px; }
+.eyebrow { color: #72828d; font-size: 10px; font-weight: 800; letter-spacing: .15em; }
+.editor-topline h1 { margin: 6px 0 0; color: #1c303e; font-size: 21px; letter-spacing: -.04em; }
+.heading-divider { margin: 0 7px; color: #a7b3b9; font-weight: 400; }
+.layout-pill { padding: 7px 10px; border: 1px solid #d7e0e3; border-radius: 6px; color: #47606a; background: #fff; font-size: 11px; font-weight: 700; }
+.slide-stage { width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; box-shadow: 0 19px 47px #24404f23, 0 2px 6px #24404f16; }
+.editor-footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 20px; }
+.editor-footer p { margin: 0; color: #5e6e7a; font-size: 12px; line-height: 1.5; }
+.editor-footer p.error { color: #a52728; font-weight: 700; }
+.slide-controls { display: flex; align-items: center; gap: 12px; white-space: nowrap; font-size: 12px; font-variant-numeric: tabular-nums; color: #627480; }
+.icon-button { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 7px; border: 1px solid #d4dfe3; background: white; color: #1d4348; font-size: 19px; }
+.icon-button:hover:not(:disabled) { background: #e8f2ef; }
+
+/* The same slide component is used by the editor, thumbnails and presentation. */
+.slide-canvas { --deck-line: color-mix(in srgb, var(--deck-accent) 22%, var(--deck-surface)); --deck-soft: color-mix(in srgb, var(--deck-accent) 12%, var(--deck-surface)); --deck-dark: color-mix(in srgb, var(--deck-ink) 86%, var(--deck-accent)); --deck-on-dark-muted: color-mix(in srgb, var(--deck-surface) 78%, var(--deck-accent)); position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; isolation: isolate; container-type: inline-size; font-family: var(--deck-body-font); color: var(--deck-ink); background: var(--deck-bg); }
+.slide-canvas h2, .slide-canvas h3, .slide-canvas p { margin: 0; }
+.slide-canvas [data-block-id] { overflow-wrap: anywhere; white-space: pre-wrap; }
+.slide-canvas .slide-title { font-family: var(--deck-heading-font); font-size: 5.1cqw; line-height: 1.04; letter-spacing: -.055em; font-weight: 800; }
+.slide-canvas .slide-body { font-size: 1.9cqw; line-height: 1.48; }
+.slide-canvas .provisional-stamp { position: absolute; right: 4.8cqw; bottom: 3cqw; z-index: 5; font-size: .91cqw; line-height: 1; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; opacity: .59; }
+.slide-canvas img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.slide-canvas [contenteditable] { cursor: text; border-radius: .35cqw; }
+.slide-canvas [contenteditable]:hover { box-shadow: 0 0 0 .16cqw color-mix(in srgb, var(--deck-accent) 50%, transparent); }
+.slide-canvas [contenteditable]:focus { background: color-mix(in srgb, var(--deck-surface) 8%, transparent); outline: .2cqw solid var(--deck-accent); outline-offset: .35cqw; }
+
+.layout-cover { display: grid; grid-template-columns: 56% 44%; background: var(--deck-dark); color: var(--deck-surface); }
+.layout-cover::before { content: ""; position: absolute; inset: -20% 38% auto -10%; height: 125%; background: radial-gradient(ellipse at center, color-mix(in srgb, var(--deck-accent) 65%, transparent) 0%, transparent 66%); z-index: -1; }
+.cover-copy { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: 7.5cqw 1cqw 8cqw 7cqw; }
+.layout-cover .slide-title { max-width: 54cqw; font-size: 6.1cqw; }
+.cover-subtitle { max-width: 43cqw; margin-top: 2.2cqw; color: var(--deck-on-dark-muted); font-size: 2.05cqw; line-height: 1.42; }
+.cover-visual { position: relative; align-self: center; justify-self: center; width: 35cqw; height: 37cqw; transform: rotate(-6deg); filter: drop-shadow(0 2cqw 2cqw color-mix(in srgb, var(--deck-ink) 50%, transparent)); }
+.cover-visual::before { content: ""; position: absolute; inset: 5cqw 2cqw -1cqw -3cqw; border-radius: 50%; background: color-mix(in srgb, var(--deck-accent) 40%, transparent); filter: blur(2.8cqw); z-index: -1; }
+.layout-cover .provisional-stamp { color: var(--deck-on-dark-muted); }
+
+.layout-textImage { display: grid; grid-template-columns: 52% 48%; background: var(--deck-bg); }
+.text-image-copy { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: 7cqw 5cqw 7cqw 7cqw; }
+.layout-textImage .slide-title { max-width: 47cqw; font-size: 5.25cqw; }
+.layout-textImage .slide-body { max-width: 45cqw; margin-top: 2.8cqw; color: var(--deck-muted); }
+.text-image-visual { display: grid; place-items: center; padding: 3.4cqw; background: var(--deck-soft); }
+.text-image-visual img { max-height: 45cqw; filter: drop-shadow(0 1.4cqw 1.2cqw color-mix(in srgb, var(--deck-ink) 20%, transparent)); }
+
+.layout-twoColumns { padding: 6.2cqw 6.3cqw; background: var(--deck-bg); }
+.layout-twoColumns .slide-title { max-width: 82cqw; font-size: 4.65cqw; }
+.columns-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2.2cqw; margin-top: 4cqw; }
+.column-card { min-height: 24.3cqw; padding: 3.1cqw; background: var(--deck-surface); border: .13cqw solid var(--deck-line); border-radius: 1.3cqw; box-shadow: 0 .5cqw 1.5cqw color-mix(in srgb, var(--deck-ink) 8%, transparent); }
+.column-card:nth-child(2) { background: var(--deck-soft); }
+.column-card::before { content: ""; display: block; width: 4.6cqw; height: .48cqw; margin-bottom: 2.5cqw; border-radius: 1cqw; background: var(--deck-accent); }
+.column-card h3 { font-family: var(--deck-heading-font); font-size: 2.85cqw; letter-spacing: -.04em; line-height: 1.13; }
+.column-card .slide-body { margin-top: 1.4cqw; color: var(--deck-muted); font-size: 1.68cqw; }
+
+.layout-metrics { padding: 6cqw 6.5cqw; background: var(--deck-dark); color: var(--deck-surface); }
+.layout-metrics::before { content: ""; position: absolute; width: 51cqw; height: 51cqw; right: -14cqw; top: -25cqw; border: .12cqw solid color-mix(in srgb, var(--deck-accent) 45%, transparent); border-radius: 50%; box-shadow: 0 0 0 7cqw color-mix(in srgb, var(--deck-accent) 15%, transparent), 0 0 0 15cqw color-mix(in srgb, var(--deck-accent) 8%, transparent); }
+.layout-metrics .slide-title { max-width: 79cqw; font-size: 4.8cqw; }
+.metrics-subtitle { max-width: 68cqw; margin-top: 1.2cqw; color: var(--deck-on-dark-muted); font-size: 1.8cqw; line-height: 1.45; }
+.metric-grid { position: relative; display: grid; grid-template-columns: repeat(var(--metric-count, 3), 1fr); gap: 1.6cqw; margin-top: 3.8cqw; }
+.metric-card { display: flex; flex-direction: column; justify-content: center; min-height: 18cqw; padding: 2.3cqw; border: .12cqw solid color-mix(in srgb, var(--deck-accent) 48%, transparent); border-radius: 1.1cqw; background: color-mix(in srgb, var(--deck-surface) 5%, transparent); }
+.metric-value { color: color-mix(in srgb, var(--deck-accent) 45%, var(--deck-surface)); font-family: var(--deck-heading-font); font-size: 5.4cqw; font-weight: 800; line-height: 1; letter-spacing: -.065em; }
+.metric-label { max-width: 22cqw; margin-top: 1.4cqw; color: var(--deck-on-dark-muted); font-size: 1.43cqw; line-height: 1.36; }
+.layout-metrics .provisional-stamp { color: var(--deck-on-dark-muted); }
+
+.layout-case { padding: 5.4cqw 6.4cqw; background: var(--deck-bg); }
+.layout-case .slide-title { font-size: 4.7cqw; }
+.case-grid { display: grid; grid-template-columns: 58% 42%; gap: 1.5cqw; margin-top: 2.8cqw; }
+.case-steps { display: grid; gap: 1.1cqw; }
+.case-step { display: grid; grid-template-columns: 4.3cqw 1fr; align-items: center; gap: 1.2cqw; min-height: 8cqw; padding: .9cqw 1.5cqw; border: .12cqw solid var(--deck-line); border-radius: .8cqw; background: var(--deck-surface); }
+.case-step-number { display: grid; place-items: center; width: 3.5cqw; height: 3.5cqw; border-radius: 50%; background: var(--deck-soft); color: var(--deck-accent); font-size: 1.35cqw; font-weight: 800; }
+.case-step-label { color: var(--deck-accent); font-size: 1.02cqw; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.case-step .slide-body { margin-top: .36cqw; font-size: 1.52cqw; line-height: 1.3; }
+.case-visual { display: grid; place-items: center; min-height: 26cqw; padding: 1.4cqw; border-radius: 1cqw; background: var(--deck-soft); }
+.case-visual img { max-height: 27cqw; }
+
+.layout-closing { display: grid; grid-template-columns: 58% 42%; background: color-mix(in srgb, var(--deck-ink) 56%, var(--deck-accent)); color: var(--deck-surface); }
+.layout-closing::before { content: ""; position: absolute; inset: 0; background: linear-gradient(132deg, color-mix(in srgb, var(--deck-ink) 50%, transparent), transparent 55%); z-index: -1; }
+.closing-copy { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: 7cqw 1cqw 8cqw 7cqw; }
+.layout-closing .slide-title { max-width: 55cqw; font-size: 6cqw; }
+.closing-body { max-width: 45cqw; margin-top: 2.3cqw; color: var(--deck-on-dark-muted); font-size: 2.1cqw; line-height: 1.42; }
+.closing-line { display: block; width: 8cqw; height: .38cqw; margin-top: 3.8cqw; border-radius: 1cqw; background: color-mix(in srgb, var(--deck-accent) 45%, var(--deck-surface)); }
+.closing-visual { align-self: center; justify-self: center; width: 32cqw; height: 33cqw; transform: rotate(6deg); filter: drop-shadow(0 2cqw 2cqw color-mix(in srgb, var(--deck-ink) 36%, transparent)); }
+.layout-closing .provisional-stamp { color: var(--deck-on-dark-muted); }
+
+.presentation[hidden] { display: none; }
+.presentation { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; background: #07171d; color: white; }
+.presentation-topbar, .presentation-bottom { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 59px; padding: 10px 24px; }
+.presentation-brand { font-size: 13px; font-weight: 800; letter-spacing: -.025em; }
+.presentation-brand span { color: #9db5b6; font-weight: 500; }
+.presentation-actions, .presentation-bottom > div { display: flex; align-items: center; gap: 13px; }
+.presentation-actions { font-size: 12px; color: #b6c7c8; font-variant-numeric: tabular-nums; }
+.presentation-close, .presentation-bottom button { padding: 6px 11px; border: 1px solid #6b8385; border-radius: 6px; color: white; background: #ffffff12; font-size: 12px; }
+.presentation-close:hover, .presentation-bottom button:hover:not(:disabled) { background: #ffffff30; }
+.presentation-close span { margin-left: 9px; font-size: 19px; line-height: 0; }
+.presentation-center { display: grid; place-items: center; flex: 1; min-height: 0; padding: 8px 28px; }
+.presentation-stage { width: min(calc((100vh - 132px) * 16 / 9), calc(100vw - 56px)); aspect-ratio: 16 / 9; overflow: hidden; box-shadow: 0 16px 50px #0008; }
+.presentation-bottom { font-size: 12px; color: #a8bfc0; }
+.presentation-bottom button { min-width: 37px; font-size: 17px; }
+#print-deck { display: none; }
+#measure-stage { position: fixed; left: -10000px; top: 0; width: 960px; height: 540px; visibility: hidden; pointer-events: none; }
+
+@media (max-width: 760px) {
+  .topbar { flex-wrap: wrap; gap: 12px; padding: 13px 16px; }
+  .deck-heading { flex: 1; padding-left: 12px; }
+  .demo-label { font-size: 9px; }
+  .top-actions { width: 100%; justify-content: flex-end; }
+  .workspace { display: flex; flex-direction: column; }
+  .sidebar { order: 2; padding: 17px 14px 20px; border-right: 0; border-top: 1px solid var(--ui-line); }
+  .side-heading { margin-bottom: 8px; }
+  .slide-list { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(145px, 42vw); gap: 8px; overflow-x: auto; padding-bottom: 8px; }
+  .side-note { margin-top: 7px; padding-top: 0; }
+  .editor { padding: 21px 15px 18px; }
+  .editor-footer { align-items: flex-start; }
+  .editor-footer p { max-width: 58%; }
+  .layout-pill { font-size: 10px; }
+  .presentation-topbar, .presentation-bottom { min-height: 54px; padding: 8px 13px; }
+  .presentation-center { padding: 6px; }
+  .presentation-stage { width: min(calc((100vh - 120px) * 16 / 9), calc(100vw - 12px)); }
+  .presentation-bottom > span { max-width: 65%; }
+}
+
+@media (max-width: 440px) {
+  .brand { font-size: 18px; }
+  .deck-heading { max-width: calc(100vw - 144px); }
+  .button { min-height: 35px; padding: 7px 10px; font-size: 12px; }
+  .editor-topline h1 { font-size: 18px; }
+  .editor-footer { gap: 8px; }
+  .editor-footer p { font-size: 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@page { size: 13.333in 7.5in; margin: 0; }
+@media print {
+  html, body { width: 13.333in; margin: 0; padding: 0; background: white; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .app-shell, .presentation { display: none !important; }
+  #print-deck { display: block !important; }
+  .print-page { width: 13.333in; height: 7.5in; overflow: hidden; break-after: page; page-break-after: always; }
+  .print-page:last-child { break-after: auto; page-break-after: auto; }
+  .print-page .slide-canvas { width: 100%; height: 100%; }
+}
+</style>
+</head>
+<body>
+  <a class="skip-link" href="#stage">Ir para o slide</a>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand" aria-label="Deck AI, prova técnica">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span>Deck <strong>AI</strong></span>
+      </div>
+      <div class="deck-heading">
+        <div id="deck-title" class="deck-title"></div>
+        <div class="demo-label">PROVA TÉCNICA · CONTEÚDO NEUTRO PROVISÓRIO</div>
+      </div>
+      <div class="top-actions">
+        <button id="download-html" class="button button-secondary" type="button" title="Baixar um HTML autônomo com as edições locais">Exportar HTML</button>
+        <button id="present" class="button button-primary" type="button">Apresentar <span aria-hidden="true">↗</span></button>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside class="sidebar" aria-label="Miniaturas dos slides">
+        <div class="side-heading"><h2>Slides</h2><span id="slide-count" class="count"></span></div>
+        <nav id="slide-list" class="slide-list" aria-label="Selecionar slide"></nav>
+        <div class="side-note"><span class="note-dot" aria-hidden="true"></span>Exemplo local. Sem integração com API ou salvamento.</div>
+      </aside>
+
+      <main id="stage" class="editor" tabindex="-1">
+        <div class="editor-topline">
+          <div>
+            <div class="eyebrow">PRÉVIA DO EDITOR</div>
+            <h1 id="stage-heading">Slide <span id="slide-number"></span><span class="heading-divider">/</span><span id="slide-total"></span></h1>
+          </div>
+          <div id="layout-label" class="layout-pill"></div>
+        </div>
+        <div id="slide-stage" class="slide-stage" aria-label="Slide selecionado"></div>
+        <div class="editor-footer">
+          <p id="edit-status" role="status" aria-live="polite" tabindex="-1">Clique em um texto do slide para editá-lo. As alterações ficam apenas nesta aba.</p>
+          <div class="slide-controls">
+            <button id="previous" class="icon-button" type="button" aria-label="Slide anterior" title="Slide anterior">←</button>
+            <span id="slide-position" aria-live="polite"></span>
+            <button id="next" class="icon-button" type="button" aria-label="Próximo slide" title="Próximo slide">→</button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div id="print-deck" aria-hidden="true"></div>
+  <div id="measure-stage" aria-hidden="true"></div>
+
+  <div id="presentation" class="presentation" role="dialog" aria-modal="true" aria-label="Modo de apresentação" hidden>
+    <div class="presentation-topbar">
+      <span class="presentation-brand">Deck AI <span>· demonstração</span></span>
+      <div class="presentation-actions">
+        <span id="presentation-position" aria-live="polite"></span>
+        <button id="close-presentation" class="presentation-close" type="button" aria-label="Sair da apresentação">Fechar <span aria-hidden="true">×</span></button>
+      </div>
+    </div>
+    <div class="presentation-center"><div id="presentation-stage" class="presentation-stage"></div></div>
+    <div class="presentation-bottom">
+      <span>← → para navegar · Esc para sair</span>
+      <div>
+        <button id="presentation-previous" type="button" aria-label="Slide anterior">←</button>
+        <button id="presentation-next" type="button" aria-label="Próximo slide">→</button>
+      </div>
+    </div>
+  </div>
+
+  <script id="deck-data" type="application/json">{"schemaVersion":"0.1.0-draft","id":"presentation-technical-fixture-001","documentRevision":0,"title":"Apresentação de demonstração neutra","locale":"pt-BR","theme":{"name":"Neutro para prova técnica","aspectRatio":"16:9","colors":{"background":"#F7F8FA","surface":"#FFFFFF","ink":"#182638","accent":"#176B89","muted":"#526477"},"typography":{"headingFontFamily":"Arial, Helvetica, sans-serif","bodyFontFamily":"Arial, Helvetica, sans-serif"}},"assets":[{"id":"asset-neutral-hero","kind":"image","mimeType":"image/svg+xml","path":"assets/neutral-hero.svg","provenance":{"status":"placeholder"},"dataUri":"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNjAwIiByb2xlPSJpbWciIGFyaWEtbGFiZWxsZWRieT0idGl0bGUiPgogIDx0aXRsZSBpZD0idGl0bGUiPkNvbXBvc2nDp8OjbyBhYnN0cmF0YSBkZSBmb3JtYXMgZ2VvbcOpdHJpY2FzIGF6dWlzPC90aXRsZT4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iYmciIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI0VBRjRGNyIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNEOEU4RUUiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9Im9yYiIgeDI9IjEiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjMkE4MDlCIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzE0NUM3QSIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICA8L2RlZnM+CiAgPHJlY3Qgd2lkdGg9IjgwMCIgaGVpZ2h0PSI2MDAiIHJ4PSI0OCIgZmlsbD0idXJsKCNiZykiLz4KICA8Y2lyY2xlIGN4PSI0MDMiIGN5PSIyOTQiIHI9IjE4MCIgZmlsbD0idXJsKCNvcmIpIi8+CiAgPGNpcmNsZSBjeD0iNDAzIiBjeT0iMjk0IiByPSIxMTkiIGZpbGw9IiNGN0Y4RkEiLz4KICA8cGF0aCBkPSJNNDAzIDExNGExODAgMTgwIDAgMCAxIDE4MCAxODBINDYzYTYwIDYwIDAgMCAwLTYwLTYwWiIgZmlsbD0iIzc5QjdDNyIvPgogIDxyZWN0IHg9Ijk2IiB5PSIzOTQiIHdpZHRoPSIyMjYiIGhlaWdodD0iODYiIHJ4PSIyOCIgZmlsbD0iI0ZGRkZGRiIgb3BhY2l0eT0iLjk0Ii8+CiAgPHJlY3QgeD0iMTI2IiB5PSI0MjQiIHdpZHRoPSIxMjIiIGhlaWdodD0iMTIiIHJ4PSI2IiBmaWxsPSIjOEVCQ0M5Ii8+CiAgPHJlY3QgeD0iMTI2IiB5PSI0NDYiIHdpZHRoPSI3OCIgaGVpZ2h0PSI4IiByeD0iNCIgZmlsbD0iI0NBRERFMyIvPgogIDxyZWN0IHg9IjUyMiIgeT0iOTIiIHdpZHRoPSIxODMiIGhlaWdodD0iMTI0IiByeD0iMzAiIGZpbGw9IiNGRkZGRkYiIG9wYWNpdHk9Ii44OCIvPgogIDxjaXJjbGUgY3g9IjU2OCIgY3k9IjE1MSIgcj0iMjIiIGZpbGw9IiNCMUQyREEiLz4KICA8cmVjdCB4PSI2MDciIHk9IjEzNSIgd2lkdGg9IjY3IiBoZWlnaHQ9IjEwIiByeD0iNSIgZmlsbD0iIzdBQUZDMCIvPgogIDxyZWN0IHg9IjYwNyIgeT0iMTU0IiB3aWR0aD0iNDUiIGhlaWdodD0iOCIgcng9IjQiIGZpbGw9IiNDQURERTMiLz4KPC9zdmc+Cg=="},{"id":"asset-neutral-workflow","kind":"image","mimeType":"image/svg+xml","path":"assets/neutral-workflow.svg","provenance":{"status":"placeholder"},"dataUri":"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNjAwIiByb2xlPSJpbWciIGFyaWEtbGFiZWxsZWRieT0idGl0bGUiPgogIDx0aXRsZSBpZD0idGl0bGUiPlRyw6pzIGNhcnTDtWVzIGFic3RyYXRvcyBjb25lY3RhZG9zIGVtIHNlcXXDqm5jaWE8L3RpdGxlPgogIDxyZWN0IHdpZHRoPSI4MDAiIGhlaWdodD0iNjAwIiByeD0iNDgiIGZpbGw9IiNFQUY0RjciLz4KICA8cGF0aCBkPSJNMjE4IDI5MWgxMTJtMTMwIDBoMTEyIiBmaWxsPSJub25lIiBzdHJva2U9IiM3QUFGQzAiIHN0cm9rZS13aWR0aD0iMTQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxwYXRoIGQ9Im0zMTQgMjc0IDIxIDE3LTIxIDE3bTI0MS0zNCAyMSAxNy0yMSAxNyIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjN0FBRkMwIiBzdHJva2Utd2lkdGg9IjEyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICA8ZyBmaWxsPSIjRkZGRkZGIiBzdHJva2U9IiNCQ0Q4RTAiIHN0cm9rZS13aWR0aD0iMyI+CiAgICA8cmVjdCB4PSI1NiIgeT0iMTg1IiB3aWR0aD0iMTc4IiBoZWlnaHQ9IjIxNCIgcng9IjI2Ii8+CiAgICA8cmVjdCB4PSIzMTEiIHk9IjE1MCIgd2lkdGg9IjE3OCIgaGVpZ2h0PSIyODQiIHJ4PSIyNiIvPgogICAgPHJlY3QgeD0iNTY2IiB5PSIxODUiIHdpZHRoPSIxNzgiIGhlaWdodD0iMjE0IiByeD0iMjYiLz4KICA8L2c+CiAgPGNpcmNsZSBjeD0iMTQ1IiBjeT0iMjU4IiByPSIzMSIgZmlsbD0iI0I4RDZERiIvPgogIDxjaXJjbGUgY3g9IjQwMCIgY3k9IjIyOCIgcj0iMzEiIGZpbGw9IiMzQjhEQTYiLz4KICA8Y2lyY2xlIGN4PSI2NTUiIGN5PSIyNTgiIHI9IjMxIiBmaWxsPSIjQjhENkRGIi8+CiAgPGcgZmlsbD0iI0NERERFMyI+CiAgICA8cmVjdCB4PSI5MSIgeT0iMzEzIiB3aWR0aD0iMTA4IiBoZWlnaHQ9IjEyIiByeD0iNiIvPgogICAgPHJlY3QgeD0iOTEiIHk9IjMzNyIgd2lkdGg9Ijc4IiBoZWlnaHQ9IjkiIHJ4PSI0LjUiLz4KICAgIDxyZWN0IHg9IjM0OCIgeT0iMjg2IiB3aWR0aD0iMTA0IiBoZWlnaHQ9IjEyIiByeD0iNiIvPgogICAgPHJlY3QgeD0iMzQ4IiB5PSIzMTAiIHdpZHRoPSI3MiIgaGVpZ2h0PSI5IiByeD0iNC41Ii8+CiAgICA8cmVjdCB4PSIzNDgiIHk9IjM0NiIgd2lkdGg9IjEwNCIgaGVpZ2h0PSIxMiIgcng9IjYiLz4KICAgIDxyZWN0IHg9IjM0OCIgeT0iMzcwIiB3aWR0aD0iODQiIGhlaWdodD0iOSIgcng9IjQuNSIvPgogICAgPHJlY3QgeD0iNjAxIiB5PSIzMTMiIHdpZHRoPSIxMDgiIGhlaWdodD0iMTIiIHJ4PSI2Ii8+CiAgICA8cmVjdCB4PSI2MDEiIHk9IjMzNyIgd2lkdGg9Ijc4IiBoZWlnaHQ9IjkiIHJ4PSI0LjUiLz4KICA8L2c+Cjwvc3ZnPgo="},{"id":"asset-neutral-case","kind":"image","mimeType":"image/svg+xml","path":"assets/neutral-case.svg","provenance":{"status":"placeholder"},"dataUri":"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNjAwIiByb2xlPSJpbWciIGFyaWEtbGFiZWxsZWRieT0idGl0bGUiPgogIDx0aXRsZSBpZD0idGl0bGUiPklsdXN0cmHDp8OjbyBhYnN0cmF0YSBkZSBjYXJ0w7VlcyBvcmdhbml6YWRvcyBlbSB1bWEgZ3JhZGU8L3RpdGxlPgogIDxyZWN0IHdpZHRoPSI4MDAiIGhlaWdodD0iNjAwIiByeD0iNDgiIGZpbGw9IiNFQUY0RjciLz4KICA8cmVjdCB4PSI5MSIgeT0iOTAiIHdpZHRoPSI2MTgiIGhlaWdodD0iNDIwIiByeD0iMzIiIGZpbGw9IiNGRkZGRkYiLz4KICA8cmVjdCB4PSIxMjgiIHk9IjEyNiIgd2lkdGg9IjU0NCIgaGVpZ2h0PSI1MCIgcng9IjE1IiBmaWxsPSIjRDhFOUVFIi8+CiAgPGNpcmNsZSBjeD0iMTU3IiBjeT0iMTUxIiByPSI4IiBmaWxsPSIjNEI5OEFGIi8+CiAgPGNpcmNsZSBjeD0iMTg0IiBjeT0iMTUxIiByPSI4IiBmaWxsPSIjOTJDMUNGIi8+CiAgPGNpcmNsZSBjeD0iMjExIiBjeT0iMTUxIiByPSI4IiBmaWxsPSIjQkREN0RGIi8+CiAgPHJlY3QgeD0iMTI4IiB5PSIyMDciIHdpZHRoPSIyNDkiIGhlaWdodD0iMjY4IiByeD0iMjIiIGZpbGw9IiNGMUY3RjkiLz4KICA8cmVjdCB4PSI0MDUiIHk9IjIwNyIgd2lkdGg9IjI2NyIgaGVpZ2h0PSIxMTYiIHJ4PSIyMiIgZmlsbD0iI0UyRjBGMyIvPgogIDxyZWN0IHg9IjQwNSIgeT0iMzQ5IiB3aWR0aD0iMjY3IiBoZWlnaHQ9IjEyNiIgcng9IjIyIiBmaWxsPSIjRDZFOUVFIi8+CiAgPGNpcmNsZSBjeD0iMjUzIiBjeT0iMjkwIiByPSI0OSIgZmlsbD0iI0E2Q0ZEQSIvPgogIDxwYXRoIGQ9Im0yMzIgMjg5IDE1IDE3IDMwLTM1IiBmaWxsPSJub25lIiBzdHJva2U9IiMxNzZCODkiIHN0cm9rZS13aWR0aD0iMTEiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogIDxyZWN0IHg9IjE3OCIgeT0iMzcyIiB3aWR0aD0iMTUyIiBoZWlnaHQ9IjEyIiByeD0iNiIgZmlsbD0iI0E5Q0FENCIvPgogIDxyZWN0IHg9IjE5OSIgeT0iMzk4IiB3aWR0aD0iMTA5IiBoZWlnaHQ9IjkiIHJ4PSI0LjUiIGZpbGw9IiNDOERERTMiLz4KICA8cmVjdCB4PSI0NDEiIHk9IjI0NyIgd2lkdGg9IjE5MSIgaGVpZ2h0PSIxMyIgcng9IjYuNSIgZmlsbD0iIzhDQkJDOSIvPgogIDxyZWN0IHg9IjQ0MSIgeT0iMjc1IiB3aWR0aD0iMTI2IiBoZWlnaHQ9IjkiIHJ4PSI0LjUiIGZpbGw9IiNCRkQ3REYiLz4KICA8cmVjdCB4PSI0NDEiIHk9IjM4OSIgd2lkdGg9IjE2NCIgaGVpZ2h0PSIxMyIgcng9IjYuNSIgZmlsbD0iIzdFQjNDMyIvPgogIDxyZWN0IHg9IjQ0MSIgeT0iNDE3IiB3aWR0aD0iMTIyIiBoZWlnaHQ9IjkiIHJ4PSI0LjUiIGZpbGw9IiNBRUNFRDciLz4KPC9zdmc+Cg=="},{"id":"asset-neutral-closing","kind":"image","mimeType":"image/svg+xml","path":"assets/neutral-closing.svg","provenance":{"status":"placeholder"},"dataUri":"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNjAwIiByb2xlPSJpbWciIGFyaWEtbGFiZWxsZWRieT0idGl0bGUiPgogIDx0aXRsZSBpZD0idGl0bGUiPkFyY29zIGdlb23DqXRyaWNvcyBhYnN0cmF0b3MgZW0gdG9ucyBkZSBhenVsPC90aXRsZT4KICA8cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgcng9IjQ4IiBmaWxsPSIjRUFGNEY3Ii8+CiAgPGNpcmNsZSBjeD0iNDAwIiBjeT0iMzAwIiByPSIyMjYiIGZpbGw9IiNENEU4RUUiLz4KICA8cGF0aCBkPSJNNDAwIDc0YTIyNiAyMjYgMCAwIDEgMjI2IDIyNkg1MDdhMTA3IDEwNyAwIDAgMC0xMDctMTA3WiIgZmlsbD0iIzE3NkI4OSIvPgogIDxwYXRoIGQ9Ik02MjYgMzAwYTIyNiAyMjYgMCAwIDEtMjI2IDIyNlY0MDdhMTA3IDEwNyAwIDAgMCAxMDctMTA3WiIgZmlsbD0iIzRGOURCMiIvPgogIDxwYXRoIGQ9Ik00MDAgNTI2YTIyNiAyMjYgMCAwIDEtMjI2LTIyNmgxMTlhMTA3IDEwNyAwIDAgMCAxMDcgMTA3WiIgZmlsbD0iIzhGQzJDRSIvPgogIDxwYXRoIGQ9Ik0xNzQgMzAwQTIyNiAyMjYgMCAwIDEgNDAwIDc0djExOWExMDcgMTA3IDAgMCAwLTEwNyAxMDdaIiBmaWxsPSIjQjFENURFIi8+CiAgPGNpcmNsZSBjeD0iNDAwIiBjeT0iMzAwIiByPSI2MSIgZmlsbD0iI0ZGRkZGRiIvPgo8L3N2Zz4K"}],"slides":[{"id":"slide-cover-001","layout":"cover","blocks":[{"id":"block-cover-title-001","slot":"title","kind":"text","value":{"text":"Ideias em apresentação"}},{"id":"block-cover-subtitle-001","slot":"subtitle","kind":"text","value":{"text":"Exemplo técnico para testar o editor e as exportações"}},{"id":"block-cover-image-001","slot":"image","kind":"image","value":{"assetId":"asset-neutral-hero","alt":"Composição abstrata de formas geométricas azuis"}}]},{"id":"slide-text-image-001","layout":"textImage","blocks":[{"id":"block-text-image-title-001","slot":"title","kind":"text","value":{"text":"Uma mensagem por slide"}},{"id":"block-text-image-body-001","slot":"body","kind":"text","value":{"text":"Este texto fictício demonstra a leitura de um parágrafo ao lado de uma imagem. Ele pode ser editado sem alterar outros slides."}},{"id":"block-text-image-image-001","slot":"image","kind":"image","value":{"assetId":"asset-neutral-workflow","alt":"Três cartões abstratos conectados em sequência"}}]},{"id":"slide-two-columns-001","layout":"twoColumns","blocks":[{"id":"block-two-columns-title-001","slot":"title","kind":"text","value":{"text":"Duas perspectivas"}},{"id":"block-two-columns-left-heading-001","slot":"leftHeading","kind":"text","value":{"text":"Ponto de partida"}},{"id":"block-two-columns-left-body-001","slot":"leftBody","kind":"text","value":{"text":"Descreva o contexto em frases curtas. Os dados exibidos aqui são apenas material de preenchimento."}},{"id":"block-two-columns-right-heading-001","slot":"rightHeading","kind":"text","value":{"text":"Próximo passo"}},{"id":"block-two-columns-right-body-001","slot":"rightBody","kind":"text","value":{"text":"Apresente a ação sugerida com linguagem direta. Esta coluna também é editável de forma independente."}}]},{"id":"slide-metrics-001","layout":"metrics","blocks":[{"id":"block-metrics-title-001","slot":"title","kind":"text","value":{"text":"Indicadores ilustrativos"}},{"id":"block-metrics-subtitle-001","slot":"subtitle","kind":"text","value":{"text":"Valores fictícios criados apenas para testar a composição."}},{"id":"block-metrics-value-001","slot":"metrics","kind":"metric","value":{"value":"01","label":"etapa inicial"}},{"id":"block-metrics-value-002","slot":"metrics","kind":"metric","value":{"value":"02","label":"etapa intermediária"}},{"id":"block-metrics-value-003","slot":"metrics","kind":"metric","value":{"value":"03","label":"etapa final"}}]},{"id":"slide-case-001","layout":"case","blocks":[{"id":"block-case-title-001","slot":"title","kind":"text","value":{"text":"Caso hipotético"}},{"id":"block-case-challenge-001","slot":"challenge","kind":"text","value":{"text":"Organizar informações dispersas em uma narrativa clara."}},{"id":"block-case-solution-001","slot":"solution","kind":"text","value":{"text":"Dividir o conteúdo em etapas visuais e revisar cada mensagem."}},{"id":"block-case-outcome-001","slot":"outcome","kind":"text","value":{"text":"Uma apresentação simples para discussão interna."}},{"id":"block-case-image-001","slot":"image","kind":"image","value":{"assetId":"asset-neutral-case","alt":"Ilustração abstrata de cartões organizados em uma grade"}}]},{"id":"slide-closing-001","layout":"closing","blocks":[{"id":"block-closing-title-001","slot":"title","kind":"text","value":{"text":"Vamos revisar juntos"}},{"id":"block-closing-body-001","slot":"body","kind":"text","value":{"text":"Fim da apresentação de exemplo. Substitua todo o conteúdo antes de qualquer uso externo."}},{"id":"block-closing-image-001","slot":"image","kind":"image","value":{"assetId":"asset-neutral-closing","alt":"Arcos geométricos abstratos em tons de azul"}}]}],"metadata":{"fixture":true,"purpose":"technical-rendering-and-export-proof","contentProvenance":{"sourceType":"synthetic-placeholder","approvalStatus":"not-approved","note":"Não é conteúdo institucional nem identidade visual aprovada da Jump."}}}</script>
+  <script>(() => {
+  "use strict";
+
+  const deck = JSON.parse(document.getElementById("deck-data").textContent);
+  const assets = new Map(deck.assets.map((asset) => [asset.id, asset]));
+  const appShell = document.querySelector(".app-shell");
+  const list = document.getElementById("slide-list");
+  const stage = document.getElementById("slide-stage");
+  const printDeck = document.getElementById("print-deck");
+  const measureStage = document.getElementById("measure-stage");
+  const presentation = document.getElementById("presentation");
+  const presentationStage = document.getElementById("presentation-stage");
+  const editStatus = document.getElementById("edit-status");
+  const layoutLabels = {
+    cover: "Capa",
+    textImage: "Texto com imagem",
+    twoColumns: "Duas colunas",
+    metrics: "Indicadores",
+    case: "Case",
+    closing: "Encerramento"
+  };
+  const slotLabels = {
+    title: "título",
+    subtitle: "subtítulo",
+    body: "texto",
+    leftHeading: "título da coluna esquerda",
+    leftBody: "texto da coluna esquerda",
+    rightHeading: "título da coluna direita",
+    rightBody: "texto da coluna direita",
+    challenge: "desafio",
+    solution: "solução",
+    outcome: "resultado",
+    metrics: "indicador"
+  };
+  let selected = 0;
+  let focusBeforePresentation = null;
+  let closingPresentation = false;
+  let fullscreenRequest = Promise.resolve();
+
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function slot(slide, name) {
+    return slide.blocks.find((block) => block.slot === name);
+  }
+
+  function textNode(block, tag, className, editable, field = "text") {
+    const node = el(tag, className, block.value[field]);
+    node.dataset.blockId = block.id;
+    node.dataset.field = field;
+    if (editable) {
+      node.contentEditable = "plaintext-only";
+      node.spellcheck = true;
+      node.setAttribute("aria-label", `Editar ${slotLabels[block.slot] || "texto"}`);
+    }
+    return node;
+  }
+
+  function picture(slide, className) {
+    const block = slot(slide, "image");
+    const asset = assets.get(block.value.assetId);
+    const wrap = el("div", className);
+    const img = el("img");
+    img.src = asset.dataUri;
+    img.alt = block.value.alt;
+    img.decoding = "sync";
+    wrap.append(img);
+    return wrap;
+  }
+
+  function renderCover(slide, canvas, editable) {
+    const copy = el("div", "cover-copy");
+    copy.append(
+      textNode(slot(slide, "title"), "h2", "slide-title", editable),
+      textNode(slot(slide, "subtitle"), "p", "cover-subtitle", editable)
+    );
+    canvas.append(copy, picture(slide, "cover-visual"));
+  }
+
+  function renderTextImage(slide, canvas, editable) {
+    const copy = el("div", "text-image-copy");
+    copy.append(
+      textNode(slot(slide, "title"), "h2", "slide-title", editable),
+      textNode(slot(slide, "body"), "p", "slide-body", editable)
+    );
+    canvas.append(copy, picture(slide, "text-image-visual"));
+  }
+
+  function column(slide, headingSlot, bodySlot, editable) {
+    const card = el("div", "column-card");
+    card.append(
+      textNode(slot(slide, headingSlot), "h3", "", editable),
+      textNode(slot(slide, bodySlot), "p", "slide-body", editable)
+    );
+    return card;
+  }
+
+  function renderTwoColumns(slide, canvas, editable) {
+    const columns = el("div", "columns-grid");
+    columns.append(
+      column(slide, "leftHeading", "leftBody", editable),
+      column(slide, "rightHeading", "rightBody", editable)
+    );
+    canvas.append(textNode(slot(slide, "title"), "h2", "slide-title", editable), columns);
+  }
+
+  function renderMetrics(slide, canvas, editable) {
+    const grid = el("div", "metric-grid");
+    const metrics = slide.blocks.filter((item) => item.slot === "metrics");
+    grid.style.setProperty("--metric-count", String(metrics.length));
+    for (const block of metrics) {
+      const card = el("div", "metric-card");
+      card.append(
+        textNode(block, "div", "metric-value", editable, "value"),
+        textNode(block, "div", "metric-label", editable, "label")
+      );
+      grid.append(card);
+    }
+    canvas.append(
+      textNode(slot(slide, "title"), "h2", "slide-title", editable),
+      textNode(slot(slide, "subtitle"), "p", "metrics-subtitle", editable),
+      grid
+    );
+  }
+
+  function caseStep(slide, name, number, label, editable) {
+    const step = el("div", "case-step");
+    const copy = el("div");
+    copy.append(el("div", "case-step-label", label), textNode(slot(slide, name), "p", "slide-body", editable));
+    step.append(el("div", "case-step-number", number), copy);
+    return step;
+  }
+
+  function renderCase(slide, canvas, editable) {
+    const grid = el("div", "case-grid");
+    const steps = el("div", "case-steps");
+    steps.append(
+      caseStep(slide, "challenge", "01", "Desafio", editable),
+      caseStep(slide, "solution", "02", "Abordagem", editable),
+      caseStep(slide, "outcome", "03", "Resultado", editable)
+    );
+    grid.append(steps, picture(slide, "case-visual"));
+    canvas.append(textNode(slot(slide, "title"), "h2", "slide-title", editable), grid);
+  }
+
+  function renderClosing(slide, canvas, editable) {
+    const copy = el("div", "closing-copy");
+    copy.append(
+      textNode(slot(slide, "title"), "h2", "slide-title", editable),
+      textNode(slot(slide, "body"), "p", "closing-body", editable),
+      el("span", "closing-line")
+    );
+    canvas.append(copy, picture(slide, "closing-visual"));
+  }
+
+  const renderers = {
+    cover: renderCover,
+    textImage: renderTextImage,
+    twoColumns: renderTwoColumns,
+    metrics: renderMetrics,
+    case: renderCase,
+    closing: renderClosing
+  };
+
+  function renderSlide(slide, index, editable) {
+    const canvas = el("article", `slide-canvas layout-${slide.layout}`);
+    canvas.setAttribute("aria-label", `Slide ${index + 1}: ${slot(slide, "title").value.text}`);
+    renderers[slide.layout](slide, canvas, editable);
+    canvas.append(el("span", "provisional-stamp", "Conteúdo provisório · Deck AI"));
+    return canvas;
+  }
+
+  function slideTitle(slide) {
+    return slot(slide, "title").value.text.trim() || "Sem título";
+  }
+
+  function sizeThumbnails() {
+    for (const viewport of list.querySelectorAll(".thumbnail-viewport")) {
+      viewport.style.setProperty("--thumb-scale", String(viewport.getBoundingClientRect().width / 960));
+    }
+  }
+
+  function thumbnail(slide, index) {
+    const button = el("button", "thumb-button");
+    button.type = "button";
+    button.dataset.index = String(index);
+    button.setAttribute("aria-label", `Selecionar slide ${index + 1}: ${slideTitle(slide)}`);
+    button.setAttribute("aria-current", index === selected ? "true" : "false");
+    const viewport = el("div", "thumbnail-viewport");
+    viewport.setAttribute("aria-hidden", "true");
+    viewport.append(renderSlide(slide, index, false));
+    const title = el("div", "thumbnail-title");
+    title.append(el("span", "thumbnail-number", String(index + 1).padStart(2, "0")), el("span", "", slideTitle(slide)));
+    button.append(viewport, title);
+    button.addEventListener("click", () => selectSlide(index));
+    return button;
+  }
+
+  function renderThumbnails() {
+    list.replaceChildren(...deck.slides.map((slide, index) => thumbnail(slide, index)));
+    sizeThumbnails();
+  }
+
+  function updateThumbnail(index) {
+    const button = list.querySelector(`[data-index="${index}"]`);
+    if (!button) return;
+    const viewport = button.querySelector(".thumbnail-viewport");
+    viewport.replaceChildren(renderSlide(deck.slides[index], index, false));
+    button.querySelector(".thumbnail-title > span:last-child").textContent = slideTitle(deck.slides[index]);
+    button.setAttribute("aria-label", `Selecionar slide ${index + 1}: ${slideTitle(deck.slides[index])}`);
+    sizeThumbnails();
+  }
+
+  function renderEditor() {
+    const slide = deck.slides[selected];
+    stage.replaceChildren(renderSlide(slide, selected, true));
+    document.getElementById("slide-number").textContent = String(selected + 1);
+    document.getElementById("slide-total").textContent = String(deck.slides.length);
+    document.getElementById("slide-position").textContent = `${selected + 1} de ${deck.slides.length}`;
+    document.getElementById("layout-label").textContent = layoutLabels[slide.layout];
+    document.getElementById("previous").disabled = selected === 0;
+    document.getElementById("next").disabled = selected === deck.slides.length - 1;
+    for (const button of list.querySelectorAll(".thumb-button")) {
+      button.setAttribute("aria-current", Number(button.dataset.index) === selected ? "true" : "false");
+    }
+  }
+
+  function renderPresentation() {
+    presentationStage.replaceChildren(renderSlide(deck.slides[selected], selected, false));
+    document.getElementById("presentation-position").textContent = `${selected + 1} / ${deck.slides.length}`;
+    document.getElementById("presentation-previous").disabled = selected === 0;
+    document.getElementById("presentation-next").disabled = selected === deck.slides.length - 1;
+  }
+
+  function renderPrintDeck() {
+    printDeck.replaceChildren(...deck.slides.map((slide, index) => {
+      const page = el("div", "print-page");
+      page.append(renderSlide(slide, index, false));
+      return page;
+    }));
+  }
+
+  function updatePrintSlide(index) {
+    const page = printDeck.children[index];
+    if (page) page.replaceChildren(renderSlide(deck.slides[index], index, false));
+  }
+
+  function selectSlide(index) {
+    if (index < 0 || index >= deck.slides.length) return;
+    selected = index;
+    renderEditor();
+    if (!presentation.hidden) renderPresentation();
+  }
+
+  function slideHasOverflow(slide, index) {
+    const canvas = renderSlide(slide, index, false);
+    measureStage.replaceChildren(canvas);
+    const bounds = canvas.getBoundingClientRect();
+    const blocks = [...canvas.querySelectorAll("[data-block-id]")];
+    const rects = blocks.map((block) => block.getBoundingClientRect());
+    const outside = blocks.some((block, item) => {
+      const rect = rects[item];
+      return rect.left < bounds.left - 1 || rect.right > bounds.right + 1 ||
+        rect.top < bounds.top - 1 || rect.bottom > bounds.bottom + 1;
+    });
+    if (outside) return true;
+    return rects.some((first, i) => rects.slice(i + 1).some((second) => {
+      const horizontal = Math.min(first.right, second.right) - Math.max(first.left, second.left);
+      const vertical = Math.min(first.bottom, second.bottom) - Math.max(first.top, second.top);
+      return horizontal > 2 && vertical > 2;
+    }));
+  }
+
+  function overflowSlides() {
+    return deck.slides.flatMap((slide, index) => slideHasOverflow(slide, index) ? [index + 1] : []);
+  }
+
+  function safeColor(value, fallback) {
+    return typeof value === "string" && /^#[0-9a-fA-F]{3,8}$/.test(value) ? value : fallback;
+  }
+
+  function safeFont(value) {
+    return typeof value === "string" && /^[a-zA-Z0-9, '\"-]+$/.test(value) ? value : "Arial, sans-serif";
+  }
+
+  function applyTheme() {
+    const colors = deck.theme.colors || {};
+    const type = deck.theme.typography || {};
+    const root = document.documentElement.style;
+    root.setProperty("--deck-bg", safeColor(colors.background, "#f8f6f2"));
+    root.setProperty("--deck-surface", safeColor(colors.surface, "#ffffff"));
+    root.setProperty("--deck-ink", safeColor(colors.ink, "#172d38"));
+    root.setProperty("--deck-accent", safeColor(colors.accent, "#276f68"));
+    root.setProperty("--deck-muted", safeColor(colors.muted, "#63767a"));
+    root.setProperty("--deck-heading-font", safeFont(type.headingFontFamily));
+    root.setProperty("--deck-body-font", safeFont(type.bodyFontFamily));
+  }
+
+  function openPresentation() {
+    focusBeforePresentation = document.activeElement;
+    presentation.hidden = false;
+    appShell.inert = true;
+    appShell.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "hidden";
+    renderPresentation();
+    document.getElementById("close-presentation").focus();
+    if (document.documentElement.requestFullscreen) {
+      fullscreenRequest = document.documentElement.requestFullscreen().catch(() => {});
+    }
+  }
+
+  async function closePresentation() {
+    if (presentation.hidden || closingPresentation) return;
+    closingPresentation = true;
+    await fullscreenRequest;
+    if (document.fullscreenElement && document.exitFullscreen) {
+      try { await document.exitFullscreen(); } catch (_) { /* fixed overlay still closes */ }
+    }
+    presentation.hidden = true;
+    appShell.inert = false;
+    appShell.removeAttribute("aria-hidden");
+    document.body.style.overflow = "";
+    if (focusBeforePresentation && focusBeforePresentation.focus) focusBeforePresentation.focus();
+    closingPresentation = false;
+  }
+
+  function safeJson(data) {
+    return JSON.stringify(data).replaceAll("&", "\\u0026").replaceAll("<", "\\u003c").replaceAll(">", "\\u003e");
+  }
+
+  function downloadHtml() {
+    const overflow = overflowSlides();
+    if (overflow.length) {
+      editStatus.classList.add("error");
+      editStatus.textContent = `Há texto fora da área visível nos slides ${overflow.join(", ")}. Encurte o texto antes de exportar.`;
+      editStatus.focus();
+      return;
+    }
+    editStatus.classList.remove("error");
+    const copy = document.documentElement.cloneNode(true);
+    copy.querySelector("#slide-list").replaceChildren();
+    copy.querySelector("#slide-stage").replaceChildren();
+    copy.querySelector("#presentation-stage").replaceChildren();
+    copy.querySelector("#print-deck").replaceChildren();
+    copy.querySelector("#measure-stage").replaceChildren();
+    copy.querySelector("#presentation").hidden = true;
+    copy.querySelector(".app-shell").removeAttribute("inert");
+    copy.querySelector(".app-shell").removeAttribute("aria-hidden");
+    copy.querySelector("#deck-data").textContent = safeJson(deck);
+    const blob = new Blob(["<!doctype html>\n", copy.outerHTML], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = el("a");
+    anchor.href = url;
+    anchor.download = "deck-ai-prova-offline.html";
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    editStatus.textContent = "HTML autônomo baixado com o conteúdo atual desta aba.";
+  }
+
+  stage.addEventListener("input", (event) => {
+    const target = event.target.closest("[data-block-id]");
+    if (!target || !target.isContentEditable) return;
+    const block = deck.slides[selected].blocks.find((item) => item.id === target.dataset.blockId);
+    if (!block) return;
+    block.value[target.dataset.field] = target.innerText.replace(/\r/g, "");
+    updateThumbnail(selected);
+    updatePrintSlide(selected);
+    if (slideHasOverflow(deck.slides[selected], selected)) {
+      editStatus.classList.add("error");
+      editStatus.textContent = "O texto editado não cabe na área visível do slide. Encurte-o antes de exportar.";
+    } else {
+      editStatus.classList.remove("error");
+      editStatus.textContent = "Alterações locais nesta aba. Exporte o HTML para guardar esta versão; não há salvamento por API.";
+    }
+  });
+
+  stage.addEventListener("paste", (event) => {
+    const target = event.target.closest("[data-block-id]");
+    if (!target || !target.isContentEditable) return;
+    event.preventDefault();
+    const plainText = event.clipboardData.getData("text/plain");
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    if (!target.contains(range.commonAncestorContainer)) return;
+    range.deleteContents();
+    const node = document.createTextNode(plainText);
+    range.insertNode(node);
+    range.setStartAfter(node);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    target.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+
+  stage.addEventListener("focusout", (event) => {
+    const target = event.target.closest("[data-block-id]");
+    if (!target || !target.isContentEditable) return;
+    const block = deck.slides[selected].blocks.find((item) => item.id === target.dataset.blockId);
+    if (block) target.replaceChildren(document.createTextNode(block.value[target.dataset.field]));
+  });
+
+  list.addEventListener("keydown", (event) => {
+    const button = event.target.closest(".thumb-button");
+    if (!button) return;
+    const current = Number(button.dataset.index);
+    let next = current;
+    if (event.key === "ArrowDown" || event.key === "ArrowRight") next = Math.min(current + 1, deck.slides.length - 1);
+    else if (event.key === "ArrowUp" || event.key === "ArrowLeft") next = Math.max(current - 1, 0);
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = deck.slides.length - 1;
+    else return;
+    event.preventDefault();
+    selectSlide(next);
+    list.querySelector(`[data-index="${next}"]`).focus();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (presentation.hidden) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closePresentation();
+      return;
+    }
+    if (event.key === "Tab") {
+      const controls = [
+        document.getElementById("close-presentation"),
+        document.getElementById("presentation-previous"),
+        document.getElementById("presentation-next")
+      ].filter((control) => !control.disabled);
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+      return;
+    }
+    if (event.key === "ArrowRight" || event.key === "PageDown" || (event.key === " " && event.target.tagName !== "BUTTON")) {
+      event.preventDefault();
+      selectSlide(Math.min(selected + 1, deck.slides.length - 1));
+    } else if (event.key === "ArrowLeft" || event.key === "PageUp") {
+      event.preventDefault();
+      selectSlide(Math.max(selected - 1, 0));
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      selectSlide(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      selectSlide(deck.slides.length - 1);
+    }
+  });
+
+  document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement && !presentation.hidden) closePresentation();
+  });
+
+  document.getElementById("deck-title").textContent = deck.title;
+  document.getElementById("slide-count").textContent = String(deck.slides.length);
+  document.getElementById("previous").addEventListener("click", () => selectSlide(selected - 1));
+  document.getElementById("next").addEventListener("click", () => selectSlide(selected + 1));
+  document.getElementById("present").addEventListener("click", openPresentation);
+  document.getElementById("close-presentation").addEventListener("click", closePresentation);
+  document.getElementById("presentation-previous").addEventListener("click", () => selectSlide(selected - 1));
+  document.getElementById("presentation-next").addEventListener("click", () => selectSlide(selected + 1));
+  document.getElementById("download-html").addEventListener("click", downloadHtml);
+  if (window.ResizeObserver) new ResizeObserver(sizeThumbnails).observe(list);
+  else window.addEventListener("resize", sizeThumbnails);
+  applyTheme();
+  renderThumbnails();
+  renderEditor();
+  renderPrintDeck();
+})();
+</script>
+</body>
+</html>
