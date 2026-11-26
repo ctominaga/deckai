@@ -1,6 +1,6 @@
 # Prova HTML offline — fase 0
 
-Esta prova lê [`../examples/presentation.example.json`](../examples/presentation.example.json) e gera o mesmo HTML autônomo em três locais: `proof/dist/deck.html`, para uso offline, `preview-dev3/editor-dev2.html`, para a prévia legada, e `apps/web/public/editor-dev2.html`, para a aplicação nova. O JSON é o modelo usado pela prova, pelas miniaturas, pela apresentação e pela impressão. Os quatro SVGs neutros são incorporados como `data:` URIs. A fixture e o contrato ainda são **provisórios**.
+Esta prova lê [`../examples/presentation.example.json`](../examples/presentation.example.json) e gera o mesmo HTML autônomo em quatro locais: `proof/dist/deck.html`, para uso offline, `preview-dev3/editor-dev2.html`, para a prévia legada, `apps/web/public/editor-dev2.html`, para a aplicação nova, e `dist/editor-dev2.html`, para a prévia estática em `dist/`. O JSON é o modelo usado pela prova, pelas miniaturas, pela apresentação e pela impressão. Os quatro SVGs neutros são incorporados como `data:` URIs. A fixture e o contrato ainda são **provisórios**.
 
 ## Gerar e abrir
 
@@ -19,7 +19,7 @@ python proof/build.py
 
 O build falha se faltar algum dos seis layouts, se houver IDs repetidos, bloco incompatível com o slot, imagem ausente ou referência de recurso remoto. `proof/dist/deck.html` pode ser copiado sozinho e aberto por `file:` sem servidor. Abra com a rede desconectada para conferir o uso offline.
 
-Para abrir a mesma prova pela prévia legada, execute `python -m http.server 5173` na pasta `preview-dev3` e acesse `http://localhost:5173/editor-dev2.html`. A aplicação nova também oferece um link para `/editor-dev2.html`. O build atualiza os três arquivos com o mesmo conteúdo; gere novamente após mudar o JSON, o CSS, o JavaScript ou os SVGs. A versão da fixture (`0.1.0-draft`) difere do schema compartilhado (`1.0`), portanto esta página ainda não lê nem salva as apresentações do Dev 3.
+Para abrir a mesma prova pela prévia legada, execute `python -m http.server 5173` na pasta `preview-dev3` e acesse `http://localhost:5173/editor-dev2.html`. A aplicação nova e a prévia estática em `dist/` também oferecem um link para `/editor-dev2.html`. O build atualiza os quatro arquivos com o mesmo conteúdo; gere novamente após mudar o JSON, o CSS, o JavaScript ou os SVGs. A versão da fixture (`0.1.0-draft`) difere do schema compartilhado (`1.0`), portanto esta página ainda não lê nem salva as apresentações do Dev 3.
 
 ## O que experimentar
 

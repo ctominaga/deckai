@@ -18,6 +18,12 @@
     .side-note{width:230px;bottom:26px;border:0;border-top:1px solid #4c4c47;border-radius:0;padding:15px 12px;color:#aaa9a1}
     .main{padding:34px 42px;max-width:1500px}.eyebrow{color:#70706b;font-size:10px;letter-spacing:.16em}.title{font-size:42px;font-weight:700;letter-spacing:-.065em;margin:8px 0 4px}.subtitle{font-size:15px}
     .top{margin-bottom:34px}.avatar{background:#d7ff45;color:#171717;border-radius:4px}.card,.panel{border-radius:3px;box-shadow:none}.card{padding:20px;border-top:3px solid #171717}.card-label{text-transform:uppercase;letter-spacing:.08em;font-size:10px}.metric{font-size:34px;letter-spacing:-.06em}.badge{border-radius:2px;text-transform:uppercase;letter-spacing:.05em;font-size:9px}.doc{border-radius:2px;background:#171717;color:#d7ff45}.primary{background:#171717;color:#d7ff45;border-radius:2px}.secondary{background:#d7ff45;color:#171717;border-radius:2px}.link{color:#171717;text-decoration:underline;text-underline-offset:3px}.row{padding:16px 0}.panel h2{letter-spacing:-.03em}.dot{background:#d7ff45}.modal{border-radius:3px}
+    .nav .editor-link{display:block;margin:8px 12px 0;padding:11px 12px;border:1px solid #d7ff45;border-radius:2px;color:#d7ff45;text-decoration:none;font-weight:700}
+    .nav .editor-link:focus-visible,.dev2-cta:focus-visible{outline:3px solid #d7ff45;outline-offset:3px}
+    .dev2-progress{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:20px;border-top:3px solid #d7ff45}
+    .dev2-progress h2{font-size:20px;margin:7px 0}.dev2-progress p{font-size:15px;line-height:1.5;margin:0;color:#55544d}.dev2-progress .small{margin-top:8px}
+    .dev2-cta{display:inline-block;background:#171717;color:#d7ff45;padding:11px 15px;text-decoration:none;font-weight:700;white-space:nowrap}
+    @media(max-width:900px){.dev2-progress{align-items:flex-start;flex-direction:column}.dev2-cta{white-space:normal}}
   </style>
 </head>
 <body>
@@ -31,6 +37,7 @@
         <button onclick="show('Exportações')">Exportações</button>
         <button onclick="show('Usuários e permissões')">Usuários e permissões</button>
         <a href="prototipo.html" style="display:block;margin:18px 12px 0;padding:11px 12px;background:#d7ff45;color:#171717;text-decoration:none;font-weight:700;border-radius:2px">Abrir protótipo funcional →</a>
+        <a class="editor-link" href="editor-dev2.html">Prova do editor · Dev 2</a>
       </nav>
       <div class="side-note"><b>Prévia local</b><br>Dados simulados para testar o fluxo do Desenvolvedor 3.</div>
     </aside>
@@ -44,6 +51,15 @@
         <div class="card"><div class="card-label">Conteúdos aprovados</div><div class="metric">86</div><div class="trend">94% dentro da validade</div></div>
         <div class="card"><div class="card-label">Exportações no mês</div><div class="metric">41</div><div class="trend">98% concluídas</div></div>
         <div class="card"><div class="card-label">Revisões pendentes</div><div class="metric">7</div><div class="trend" style="color:var(--orange)">Aguardando responsável</div></div>
+      </section>
+      <section class="panel dev2-progress" aria-labelledby="dev2-title">
+        <div>
+          <div class="eyebrow">Avanço do Dev 2 · prova local</div>
+          <h2 id="dev2-title">Editor visual e apresentação HTML</h2>
+          <p>Seis layouts 16:9, edição de textos e métricas, miniaturas, modo de apresentação, exportação HTML e impressão.</p>
+          <p class="small">Demonstração independente com conteúdo sintético e contrato provisório. As alterações ficam no navegador até exportar o HTML.</p>
+        </div>
+        <a class="dev2-cta" href="editor-dev2.html">Abrir prova do editor</a>
       </section>
       <section class="layout">
         <div class="panel"><div class="panel-head"><h2>Conteúdo Jump recente</h2><button class="link" onclick="show('Biblioteca Jump')">Ver biblioteca →</button></div>
