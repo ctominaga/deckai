@@ -6,7 +6,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import type { PresentationContent } from "@deckai/contracts";
-import { renderPresentationDocument } from "@deckai/renderer";
+import { renderPresentationDocument, type RenderAssets } from "@deckai/renderer";
 
 const runBrowser = promisify(execFile);
 export const maxPdfBytes = 10 * 1024 * 1024;
@@ -19,7 +19,7 @@ export function findPdfBrowser(): string | undefined {
   return candidates.find(candidate => existsSync(candidate));
 }
 
-export async function renderPdf(browser: string, content: PresentationContent, title: string): Promise<Buffer> {
+export async function renderPdf(browser: string, content: PresentationContent, title: string, assets: RenderAssets = {}): Promise<Buffer> {
   const tempRoot = resolve(tmpdir());
   const dir = await mkdtemp(join(tempRoot, "deckai-pdf-"));
   try {
@@ -34,7 +34,7 @@ export async function renderPdf(browser: string, content: PresentationContent, t
         .deck > .slide:last-child { break-after: auto; }
       }
     </style>`;
-    const html = renderPresentationDocument(content, title)
+    const html = renderPresentationDocument(content, title, assets)
       .replace("<head>", '<head><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:">')
       .replace("</head>", `${printStyles}</head>`);
     await writeFile(input, html, "utf8");

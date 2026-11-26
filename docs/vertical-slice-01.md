@@ -81,12 +81,12 @@ bootstrap da organização
 
 ## Limitações conhecidas
 
-- O frontend da slice edita texto, métricas, layout e adiciona slides; upload de imagens ainda não existe.
+- O editor integra seis composições do Dev 2, edição direta, apresentação e HTML offline. Upload PNG/JPEG e assets privados estão implementados; detalhes em `docs/dev2-editor-images.md`.
 - A suíte automatizada cobre contratos, renderer, autenticação, permissões, autosave, versionamento e política Jump; Playwright e QA visual automatizado ainda não foram adicionados.
 - A criação de organização é um bootstrap único. Convites e múltiplas organizações por usuário não foram implementados.
-- O renderer cobre semanticamente os tipos iniciais; os seis layouts ainda precisam de composição visual final.
+- O renderer usa as seis composições visuais do Dev 2 no schema 1.0; a homologação visual em navegador e dos arquivos exportados ainda está pendente.
 - A camada PostgreSQL servidor está implementada, mas não foi validada nesta máquina por ausência de servidor local.
-- Export jobs e artifacts possuem contrato/tabelas, porém não têm worker ou endpoints nesta fase.
+- PDF/PPTX possuem endpoints e workers; imagens são incorporadas aos arquivos. O PDF exige navegador configurado e os controles de PDF/PPTX na interface ainda estão pendentes.
 - O arquivo confidencial aprovado anteriormente não foi importado automaticamente: o modelo ainda precisa representar escopo por cliente antes de liberar esse material ao contexto da IA.
 - O MVP atual permite que owner ou reviewer aprove conteúdo próprio; separação obrigatória entre autor e aprovador continua sendo uma decisão de governança.
 

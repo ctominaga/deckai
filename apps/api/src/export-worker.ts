@@ -2,10 +2,12 @@ import { createHash, randomUUID } from "node:crypto";
 import { PresentationContentSchema, type PresentationContent } from "@deckai/contracts";
 import type { Database } from "./database.js";
 import { maxPdfBytes } from "./pdf-renderer.js";
+import type { RenderAssets } from "@deckai/renderer";
+import { resolveImages } from "./assets.js";
 
 type PdfTask = { id: string; organizationId: string; versionId: string; attempt: number; maxAttempts: number };
 type Format = "pdf" | "pptx";
-type Render = (content: PresentationContent, title: string) => Promise<Buffer>;
+type Render = (content: PresentationContent, title: string, assets: RenderAssets) => Promise<Buffer>;
 export const exportMediaTypes = {
   pdf: "application/pdf",
   pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation"
@@ -32,7 +34,8 @@ export async function processNextExport(database: Database, format: Format, rend
       WHERE v.id=$1 AND v.organization_id=$2`, [task.versionId, task.organizationId]);
     const source = version.rows[0];
     if (!source) throw new Error("EXPORT_SOURCE_MISSING");
-    const file = await render(PresentationContentSchema.parse(source.content), source.title);
+    const content = PresentationContentSchema.parse(source.content);
+    const file = await render(content, source.title, await resolveImages(database, content, task.organizationId));
     const signature = format === "pdf" ? Buffer.from("%PDF-") : Buffer.from([0x50, 0x4b, 3, 4]);
     if (file.length > maxPdfBytes || !file.subarray(0, signature.length).equals(signature)) throw new Error("EXPORT_INVALID");
     await database.transaction(async tx => {

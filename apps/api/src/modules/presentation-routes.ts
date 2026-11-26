@@ -7,6 +7,7 @@ import { authenticate, requireWrite } from "../auth.js";
 import type { Database } from "../database.js";
 import { AppError, notFound } from "../errors.js";
 import { contentHash } from "../security.js";
+import { resolveImages, validateImageReferences } from "../assets.js";
 
 type PresentationRow = { id: string; organizationId: string; title: string; status: string; currentVersionId: string; createdBy: string; createdAt: string; updatedAt: string };
 type VersionRow = { id: string; presentationId: string; versionNumber: number; schemaVersion: string; state: string; content: PresentationContent; contentHash: string; baseVersionId: string | null; createdBy: string; createdAt: string };
@@ -75,6 +76,7 @@ export function registerPresentationRoutes(app: FastifyInstance, database: Datab
     const user = await authenticate(request, database); requireWrite(user);
     const { id } = request.params as { id: string }; await scopedPresentation(database, id, user.organizationId);
     const body = SaveDraftSchema.parse(request.body); const payloadHash = contentHash(body.content);
+    await validateImageReferences(database, body.content, user.organizationId);
     return database.transaction(async (tx) => {
       const prior = await tx.query<{ payloadHash: string; response: DraftRow }>("SELECT payload_hash AS \"payloadHash\",response_json AS response FROM presentation_mutations WHERE presentation_id=$1 AND organization_id=$2 AND client_mutation_id=$3", [id, user.organizationId, body.clientMutationId]);
       if (prior.rows[0]) {
@@ -136,6 +138,7 @@ export function registerPresentationRoutes(app: FastifyInstance, database: Datab
     const presentation = await scopedPresentation(database, id, user.organizationId);
     const draft = await database.query<DraftRow>(`${draftSelect} WHERE presentation_id=$1 AND organization_id=$2`, [id, user.organizationId]);
     if (!draft.rows[0]) throw notFound("Rascunho");
-    return reply.type("text/html; charset=utf-8").send(renderPresentationDocument(PresentationContentSchema.parse(draft.rows[0].content), presentation.title));
+    const content = PresentationContentSchema.parse(draft.rows[0].content);
+    return reply.header("Cache-Control", "private, no-store").type("text/html; charset=utf-8").send(renderPresentationDocument(content, presentation.title, await resolveImages(database, content, user.organizationId)));
   });
 }

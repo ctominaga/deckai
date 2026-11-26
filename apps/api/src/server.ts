@@ -13,7 +13,7 @@ await app.listen({ host: "127.0.0.1", port });
 
 const browser = findPdfBrowser();
 const stopPdfWorker = browser && process.env.PDF_WORKER_ENABLED !== "false"
-  ? startExportWorker(database, "pdf", (content, title) => renderPdf(browser, content, title), () => app.log.error("Falha ao consultar a fila de PDF."))
+  ? startExportWorker(database, "pdf", (content, title, assets) => renderPdf(browser, content, title, assets), () => app.log.error("Falha ao consultar a fila de PDF."))
   : undefined;
 const stopPptxWorker = startExportWorker(database, "pptx", renderPptx, () => app.log.error("Falha ao consultar a fila de PPTX."));
 if (!stopPdfWorker) app.log.info("Worker de PDF desativado ou navegador indisponível.");

@@ -8,8 +8,28 @@ import { hashPassword } from "./security.js";
 import type { OutlineProvider } from "./ai-provider.js";
 import { processNextExport } from "./export-worker.js";
 import { renderPptx } from "./pptx-renderer.js";
+import { resolveImages } from "./assets.js";
+import { renderPdf } from "./pdf-renderer.js";
+import { inflateRawSync } from "node:zlib";
 
 const resources: Array<{ app: Awaited<ReturnType<typeof buildApp>>; database: Database }> = [];
+
+// Read ZIP entries through the central directory, including archives with data descriptors.
+function zipEntries(zip: Buffer): Map<string, Buffer> {
+  const end = zip.lastIndexOf(Buffer.from([0x50,0x4b,0x05,0x06]));
+  let offset = zip.readUInt32LE(end + 16);
+  const entries = new Map<string, Buffer>();
+  for (let i = 0; i < zip.readUInt16LE(end + 10); i++) {
+    const length = zip.readUInt16LE(offset + 28), extra = zip.readUInt16LE(offset + 30), comment = zip.readUInt16LE(offset + 32);
+    const name = zip.toString("utf8", offset + 46, offset + 46 + length);
+    const local = zip.readUInt32LE(offset + 42);
+    const start = local + 30 + zip.readUInt16LE(local + 26) + zip.readUInt16LE(local + 28);
+    const data = zip.subarray(start, start + zip.readUInt32LE(offset + 20));
+    entries.set(name, zip.readUInt16LE(offset + 10) === 8 ? inflateRawSync(data) : data);
+    offset += 46 + length + extra + comment;
+  }
+  return entries;
+}
 afterEach(async () => { while (resources.length) { const item = resources.pop()!; await item.app.close(); await item.database.close(); } });
 
 async function setup(outlineProvider?: OutlineProvider) {
@@ -544,4 +564,61 @@ describe("fila de exportação PDF", () => {
     expect(pptxDownload.headers["content-disposition"]).toMatch(/\.pptx"$/);
     expect(pptxDownload.rawPayload.subarray(0, 4)).toEqual(Buffer.from([0x50, 0x4b, 3, 4]));
   });
+});
+
+
+describe("imagens persistentes", () => {
+  it("isola assets por organização, persiste referências e incorpora a imagem no HTML e PPTX", async () => {
+    const { app, database } = await setup(); const authorization = await bootstrapAndLogin(app);
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
+    const headers = { authorization, "content-type": "image/png" };
+    expect((await app.inject({method:"POST",url:"/api/v1/assets?name=test.png",headers:{"content-type":"image/png"},payload:png})).statusCode).toBe(401);
+    expect((await app.inject({method:"POST",url:"/api/v1/assets?name=test.png",headers,payload:Buffer.from("<svg>bad</svg>")})).statusCode).toBe(422);
+    expect((await app.inject({method:"POST",url:"/api/v1/assets?name=large.png",headers,payload:Buffer.alloc(5*1024*1024+1)})).statusCode).toBe(413);
+    const upload = await app.inject({method:"POST",url:"/api/v1/assets?name=test.png",headers,payload:png});
+    expect(upload.statusCode).toBe(201); const asset = upload.json();
+    expect(asset).toMatchObject({width:1,height:1,mediaType:"image/png",sizeBytes:png.length});
+    const duplicate = await app.inject({method:"POST",url:"/api/v1/assets?name=again.png",headers,payload:png});
+    expect(duplicate.json().id).toBe(asset.id);
+    const file = await app.inject({method:"GET",url:"/api/v1/assets/"+asset.id+"/file",headers:{authorization}});
+    expect(file.rawPayload).toEqual(png);expect(file.headers["cache-control"]).toBe("private, no-store");
+    const created = await app.inject({method:"POST",url:"/api/v1/presentations",headers:{authorization},payload:{title:"Deck com imagem"}});
+    const id = created.json().presentationId;
+    const loaded = (await app.inject({method:"GET",url:"/api/v1/presentations/"+id,headers:{authorization}})).json();
+    loaded.draft.content.slides[0].blocks.push({id:randomUUID(),type:"image",role:"image",assetId:asset.id,alt:"Imagem de teste"});
+    const save = await app.inject({method:"PUT",url:"/api/v1/presentations/"+id+"/draft",headers:{authorization},payload:{baseVersionId:loaded.draft.baseVersionId,expectedRevision:1,clientMutationId:randomUUID(),content:loaded.draft.content}});
+    expect(save.statusCode).toBe(200);
+    const reloaded = (await app.inject({method:"GET",url:"/api/v1/presentations/"+id,headers:{authorization}})).json();
+    expect(reloaded.draft.content).toEqual(loaded.draft.content);
+    const preview = await app.inject({method:"GET",url:"/api/v1/presentations/"+id+"/preview",headers:{authorization}});
+    expect(preview.body).toContain('src="data:image/png;base64,'+png.toString("base64"));
+    const checkpoint = await app.inject({method:"POST",url:"/api/v1/presentations/"+id+"/checkpoints",headers:{authorization},payload:{baseVersionId:loaded.draft.baseVersionId,draftRevision:2,clientMutationId:randomUUID()}});
+    expect(checkpoint.statusCode).toBe(201);
+    const requested = await app.inject({method:"POST",url:"/api/v1/presentations/"+id+"/exports/pptx",headers:{authorization},payload:{versionId:checkpoint.json().id,idempotencyKey:randomUUID()}});
+    expect(requested.statusCode).toBe(202);await processNextExport(database,"pptx",renderPptx);
+    const download = await app.inject({method:"GET",url:"/api/v1/exports/"+requested.json().job.id+"/download",headers:{authorization}});
+    expect(download.statusCode).toBe(200);
+    const entries = zipEntries(download.rawPayload);
+    expect([...entries].some(([name,data])=>name.startsWith("ppt/media/")&&data.equals(png))).toBe(true);
+    expect(entries.get("ppt/slides/slide1.xml")!.toString()).toContain("<a:blip");
+    expect(entries.get("ppt/slides/slide1.xml")!.toString()).toContain("<a:t>Título da apresentação</a:t>");
+    if(process.env.PDF_BROWSER_PATH){
+      const me = (await app.inject({method:"GET",url:"/api/v1/auth/me",headers:{authorization}})).json();
+      const images = await resolveImages(database,loaded.draft.content,me.organization.id);
+      const pdf = await renderPdf(process.env.PDF_BROWSER_PATH,loaded.draft.content,"Deck com imagem",images);
+      expect(pdf.subarray(0,5).toString()).toBe("%PDF-");expect(pdf.toString("latin1")).toContain("/Subtype /Image");
+    }
+    const org = randomUUID();await database.query("INSERT INTO organizations(id,name,slug) VALUES($1,'Outra','imagens-outra')",[org]);
+    await database.query("INSERT INTO users(id,organization_id,name,email,password_hash,role) VALUES($1,$2,'Outro','outro-imagens@jump.local',$3,'owner')",[randomUUID(),org,await hashPassword("senha-outra-123")]);
+    const login = await app.inject({method:"POST",url:"/api/v1/auth/login",payload:{email:"outro-imagens@jump.local",password:"senha-outra-123"}});
+    const otherAuthorization = "Bearer "+login.json().token;
+    expect((await app.inject({method:"GET",url:"/api/v1/assets/"+asset.id+"/file",headers:{authorization:otherAuthorization}})).statusCode).toBe(404);
+    expect((await app.inject({method:"GET",url:"/api/v1/assets",headers:{authorization:otherAuthorization}})).json().items).toEqual([]);
+    const foreign = structuredClone(loaded.draft.content);const otherUpload=await app.inject({method:"POST",url:"/api/v1/assets?name=outra.png",headers:{authorization:otherAuthorization,"content-type":"image/png"},payload:png});expect(otherUpload.statusCode).toBe(201);foreign.slides[0].blocks.at(-1).assetId=otherUpload.json().id;
+    const denied = await app.inject({method:"PUT",url:"/api/v1/presentations/"+id+"/draft",headers:{authorization},payload:{baseVersionId:checkpoint.json().id,expectedRevision:1,clientMutationId:randomUUID(),content:foreign}});
+    expect(denied.statusCode).toBe(422);expect(denied.json().error.code).toBe("IMAGE_NOT_AVAILABLE");
+    await database.query("UPDATE users SET role='viewer' WHERE email='gestor@jump.local'");
+    expect((await app.inject({method:"POST",url:"/api/v1/assets?name=blocked.png",headers,payload:png})).statusCode).toBe(403);
+    expect((await app.inject({method:"GET",url:"/api/v1/assets/"+asset.id+"/file",headers:{authorization}})).statusCode).toBe(200);
+  }, 60_000);
 });

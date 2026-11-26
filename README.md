@@ -2,6 +2,10 @@
 
 Protótipo e planejamento inicial do Deck AI, uma ferramenta para criar apresentações com IA usando conteúdo institucional rastreável.
 
+## Editor integrado e imagens
+
+O editor da aplicação agora oferece os seis layouts visuais do Dev 2, edição direta de texto, apresentação e HTML offline a partir do JSON salvo na API. Uploads PNG/JPEG ficam privados por organização e são incorporados ao HTML, ao PDF e ao PPTX. Consulte [uso, contratos e limites](docs/dev2-editor-images.md).
+
 ## Aplicação integrada — primeira vertical slice
 
 A nova base da aplicação está em `apps/` e `packages/`. Ela não usa os HTMLs de `preview-dev3` como aplicação oficial.
