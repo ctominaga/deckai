@@ -10,8 +10,8 @@ export type PresentationImages = ReadonlyMap<string, PresentationImage>;
 const expectedTypes = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" } as const;
 const maxEmbeddedBytes = 8 * 1024 * 1024;
 
-export function imageDataUrls(images: PresentationImages): ReadonlyMap<string, string> {
-  return new Map([...images].map(([id, image]) => [id, image.dataUrl]));
+export function imageDataUrls(images: PresentationImages) {
+  return Object.fromEntries(images);
 }
 
 export function readImageDimensions(bytes: Buffer, mediaType: ImageMediaType): { width: number; height: number } | undefined {

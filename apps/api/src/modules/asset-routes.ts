@@ -45,7 +45,8 @@ export function registerAssetRoutes(app: FastifyInstance, database: Database): v
       if (!readImageDimensions(request.body, mediaType.data)) {
         throw new AppError(422, "IMAGE_DIMENSIONS_INVALID", "A imagem precisa ter dimensões válidas de até 8192 pixels por lado e 20 megapixels.");
       }
-      const name = nameSchema.parse(request.headers["x-asset-name"] ?? `imagem.${extensions[mediaType.data]}`);
+      const { name: queryName } = z.object({ name: z.string().optional() }).strict().parse(request.query);
+      const name = nameSchema.parse(request.headers["x-asset-name"] ?? queryName ?? `imagem.${extensions[mediaType.data]}`);
       const bytes = request.body;
       const asset = await database.transaction(async tx => {
         const inserted = await tx.query<ImageAsset>(`INSERT INTO image_assets
