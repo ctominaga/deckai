@@ -2,10 +2,12 @@ import { createHash, randomUUID } from "node:crypto";
 import { PresentationContentSchema, type PresentationContent } from "@deckai/contracts";
 import type { Database } from "./database.js";
 import { maxPdfBytes } from "./pdf-renderer.js";
+import { loadPresentationImages, type PresentationImages } from "./presentation-images.js";
+import { AppError } from "./errors.js";
 
 type PdfTask = { id: string; organizationId: string; versionId: string; attempt: number; maxAttempts: number };
 type Format = "pdf" | "pptx";
-type Render = (content: PresentationContent, title: string) => Promise<Buffer>;
+type Render = (content: PresentationContent, title: string, images: PresentationImages) => Promise<Buffer>;
 export const exportMediaTypes = {
   pdf: "application/pdf",
   pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation"
@@ -32,7 +34,9 @@ export async function processNextExport(database: Database, format: Format, rend
       WHERE v.id=$1 AND v.organization_id=$2`, [task.versionId, task.organizationId]);
     const source = version.rows[0];
     if (!source) throw new Error("EXPORT_SOURCE_MISSING");
-    const file = await render(PresentationContentSchema.parse(source.content), source.title);
+    const content = PresentationContentSchema.parse(source.content);
+    const images = await loadPresentationImages(database, content, task.organizationId);
+    const file = await render(content, source.title, images);
     const signature = format === "pdf" ? Buffer.from("%PDF-") : Buffer.from([0x50, 0x4b, 3, 4]);
     if (file.length > maxPdfBytes || !file.subarray(0, signature.length).equals(signature)) throw new Error("EXPORT_INVALID");
     await database.transaction(async tx => {
@@ -44,12 +48,14 @@ export async function processNextExport(database: Database, format: Format, rend
         VALUES ($1,$2,$3,$4,$5,$6,$7,decode($8,'base64'))`,
         [randomUUID(), task.organizationId, task.id, `db:${format}:${task.id}`, exportMediaTypes[format], file.length, createHash("sha256").update(file).digest("hex"), file.toString("base64")]);
     });
-  } catch {
+  } catch (error) {
+    const permanent = error instanceof AppError && error.code === "PRESENTATION_IMAGES_TOO_LARGE";
     const retry = task.attempt < task.maxAttempts;
     await database.query(`UPDATE export_jobs SET status=$1,locked_until=NULL,available_at=now()+make_interval(secs => $2::int),
-      error_json='{"code":"EXPORT_GENERATION_FAILED"}'::jsonb,updated_at=now()
+      error_json=$6::jsonb,updated_at=now()
       WHERE id=$3 AND organization_id=$4 AND status='running' AND attempt=$5 AND locked_until>now()`,
-      [retry ? "retrying" : "dead_letter", retry ? 2 ** task.attempt : 0, task.id, task.organizationId, task.attempt]);
+      [permanent ? "failed" : retry ? "retrying" : "dead_letter", !permanent && retry ? 2 ** task.attempt : 0,
+        task.id, task.organizationId, task.attempt, JSON.stringify({ code: permanent ? error.code : "EXPORT_GENERATION_FAILED" })]);
   }
   return true;
 }

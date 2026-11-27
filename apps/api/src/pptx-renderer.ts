@@ -1,10 +1,11 @@
 import PptxGenJS from "pptxgenjs";
 import type { PresentationContent } from "@deckai/contracts";
+import type { PresentationImages } from "./presentation-images.js";
 
 // The package exports an ESM constructor at runtime and CommonJS-shaped type declarations.
 const Presentation = PptxGenJS as unknown as typeof PptxGenJS.default;
 
-export async function renderPptx(content: PresentationContent, title: string): Promise<Buffer> {
+export async function renderPptx(content: PresentationContent, title: string, images: PresentationImages = new Map()): Promise<Buffer> {
   const deck = new Presentation();
   deck.layout = "LAYOUT_WIDE";
   deck.title = title;
@@ -30,6 +31,15 @@ export async function renderPptx(content: PresentationContent, title: string): P
     for (const [index, block] of body.entries()) {
       const x = 0.7 + (index % columns) * (columnWidth + 0.45);
       const y = 2 + Math.floor(index / columns) * rowHeight;
+      const image = block.type === "image" && block.assetId ? images.get(block.assetId) : undefined;
+      if (block.type === "image" && image && image.mediaType !== "image/webp") {
+        const scale = Math.min(columnWidth / image.width, rowHeight * 0.93 / image.height);
+        const w = image.width * scale;
+        const h = image.height * scale;
+        slide.addImage({ data: image.dataUrl, x: x + (columnWidth - w) / 2,
+          y: y + (rowHeight * 0.93 - h) / 2, w, h, altText: block.alt });
+        continue;
+      }
       const text = block.type === "text" ? block.text : block.type === "metric"
         ? `${block.value}${block.unit ? ` ${block.unit}` : ""}\n${block.label}`
         : block.alt || "Imagem ainda não selecionada";

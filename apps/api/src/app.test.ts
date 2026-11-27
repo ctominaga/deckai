@@ -8,6 +8,7 @@ import { hashPassword } from "./security.js";
 import type { OutlineProvider } from "./ai-provider.js";
 import { processNextExport } from "./export-worker.js";
 import { renderPptx } from "./pptx-renderer.js";
+import { loadPresentationImages } from "./presentation-images.js";
 
 const resources: Array<{ app: Awaited<ReturnType<typeof buildApp>>; database: Database }> = [];
 afterEach(async () => { while (resources.length) { const item = resources.pop()!; await item.app.close(); await item.database.close(); } });
@@ -32,6 +33,67 @@ const unusedProviderMethods: Pick<OutlineProvider, "generatePresentation" | "reg
   async regenerateSlide() { throw new Error("Chamada inesperada ao provedor no teste."); },
   async rewriteBlock() { throw new Error("Chamada inesperada ao provedor no teste."); }
 };
+
+describe("imagens privadas", () => {
+  it("persiste imagens válidas e restringe acesso à organização", async () => {
+    const { app, database } = await setup();
+    const url = "/api/v1/assets/images";
+    const authorization = await bootstrapAndLogin(app);
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jKZkAAAAASUVORK5CYII=", "base64");
+    const headers = { authorization, "content-type": "image/png", "x-asset-name": "exemplo.png" };
+    expect((await app.inject({ method: "POST", url, headers, payload: Buffer.from("texto") })).json().error.code).toBe("IMAGE_SIGNATURE_INVALID");
+    const unsupported = await app.inject({ method: "POST", url, headers: { authorization, "content-type": "image/svg+xml" }, payload: "<svg/>" });
+    expect(unsupported.statusCode).toBe(415);
+    const oversized = await app.inject({ method: "POST", url, headers, payload: Buffer.alloc(5 * 1024 * 1024 + 1) });
+    expect(oversized.statusCode).toBe(413);
+
+    const uploaded = await app.inject({ method: "POST", url, headers, payload: png });
+    expect(uploaded.statusCode).toBe(201);
+    const { asset } = uploaded.json();
+    expect(asset).toMatchObject({ mediaType: "image/png", sizeBytes: png.length, name: "exemplo.png" });
+    expect((await app.inject({ method: "GET", url, headers: { authorization } })).json()).toEqual({ items: [asset], nextCursor: null });
+    expect((await app.inject({ method: "GET", url: `${url}?after=${asset.id}`, headers: { authorization } })).json().items).toEqual([]);
+    const download = await app.inject({ method: "GET", url: `${url}/${asset.id}`, headers: { authorization } });
+    expect(download.statusCode).toBe(200);
+    expect(download.headers["cache-control"]).toBe("private, no-store");
+    expect(download.rawPayload).toEqual(png);
+    expect((await app.inject({ method: "GET", url: `${url}/${asset.id}` })).statusCode).toBe(401);
+
+    const otherOrg = randomUUID();
+    await database.query("INSERT INTO organizations(id,name,slug) VALUES($1,'Outra','outra-imagens')", [otherOrg]);
+    await database.query("INSERT INTO users(id,organization_id,name,email,password_hash,role) VALUES($1,$2,'Outra pessoa','outra@jump.local',$3,'viewer')", [randomUUID(), otherOrg, await hashPassword("senha-segura-456")]);
+    const otherLogin = await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { email: "outra@jump.local", password: "senha-segura-456" } });
+    expect(otherLogin.statusCode).toBe(200);
+    const otherHeaders = { authorization: `Bearer ${otherLogin.json().token}` };
+    expect((await app.inject({ method: "GET", url, headers: otherHeaders })).json().items).toEqual([]);
+    expect((await app.inject({ method: "GET", url: `${url}/${asset.id}`, headers: otherHeaders })).statusCode).toBe(404);
+    expect((await app.inject({ method: "POST", url, headers: { ...headers, ...otherHeaders }, payload: png })).statusCode).toBe(403);
+
+    const presentation = await app.inject({ method: "POST", url: "/api/v1/presentations", headers: { authorization }, payload: { title: "Imagem no slide" } });
+    expect(presentation.statusCode).toBe(201);
+    const path = `/api/v1/presentations/${presentation.json().presentationId}`;
+    const opened = await app.inject({ method: "GET", url: path, headers: { authorization } });
+    const { draft } = opened.json();
+    draft.content.slides[0].blocks.push({ id: randomUUID(), type: "image", role: "illustration", assetId: asset.id, alt: "Imagem de teste" });
+    const save = await app.inject({ method: "PUT", url: `${path}/draft`, headers: { authorization },
+      payload: { baseVersionId: draft.baseVersionId, expectedRevision: draft.revision, clientMutationId: randomUUID(), content: draft.content } });
+    expect(save.statusCode).toBe(200);
+    expect((await loadPresentationImages(database, draft.content, otherOrg)).size).toBe(0);
+    const preview = await app.inject({ method: "GET", url: `${path}/preview`, headers: { authorization } });
+    expect(preview.statusCode).toBe(200);
+    expect(preview.body).toContain(`src="data:image/png;base64,${png.toString("base64")}"`);
+    const checkpoint = await app.inject({ method: "POST", url: `${path}/checkpoints`, headers: { authorization },
+      payload: { baseVersionId: draft.baseVersionId, draftRevision: save.json().revision, clientMutationId: randomUUID() } });
+    expect(checkpoint.statusCode).toBe(201);
+    const requested = await app.inject({ method: "POST", url: `${path}/exports/pptx`, headers: { authorization },
+      payload: { versionId: checkpoint.json().id, idempotencyKey: randomUUID() } });
+    expect(requested.statusCode).toBe(202);
+    expect(await processNextExport(database, "pptx", renderPptx)).toBe(true);
+    const downloadPptx = await app.inject({ method: "GET", url: `/api/v1/exports/${requested.json().job.id}/download`, headers: { authorization } });
+    expect(downloadPptx.statusCode).toBe(200);
+    expect(downloadPptx.rawPayload.toString("latin1")).toMatch(/ppt\/media\/[^/]+\.png/);
+  });
+});
 
 describe("primeira vertical slice", () => {
   it("aplica a migration de forma idempotente", async () => {
