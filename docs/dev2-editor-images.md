@@ -21,14 +21,14 @@ O editor em `apps/web` usa as composições visuais da prova Dev 2 diretamente n
 - O JSON guarda somente `assetId` e texto alternativo. O autosave rejeita imagens inexistentes ou de outra organização. Os bytes dos assets são imutáveis, preservando checkpoints anteriores ao trocar uma imagem.
 - Preview e worker resolvem as imagens no escopo da organização. HTML/PDF recebem data URLs; PPTX incorpora a mídia e mantém textos e indicadores editáveis. As composições PPTX são nativas e podem apresentar diferenças de fontes/espaçamento em relação ao HTML.
 
-O worker PDF ainda depende de um navegador configurado em `PDF_BROWSER_PATH`. O menu de exportações PDF/PPTX continua dependendo da integração de interface tratada no item 1 do backlog; os endpoints existentes já recebem as imagens.
+O worker PDF detecta instalações padrão de Chromium/Chrome/Edge, incluindo as pastas versionadas do EdgeCore no Windows. `PDF_BROWSER_PATH` permite escolher explicitamente outro executável. O menu de exportações PDF/PPTX continua dependendo da integração de interface tratada no item 1 do backlog; os endpoints existentes já recebem as imagens.
 
 ## Validação
 
 - Suíte Vitest: contratos, renderer e API, incluindo upload autenticado, reenvio, arquivo inválido, limite de tamanho, persistência, checkpoint, isolamento entre organizações e permissão de viewer.
 - O teste PPTX abre o ZIP gerado e verifica os bytes da imagem, a referência do slide à mídia e o texto editável.
 - O teste do renderer cobre os seis layouts, preservação de todos os IDs dos blocos, escape de texto/alt e bloqueio de URLs externas.
-- Com `PDF_BROWSER_PATH` configurado, a suíte também tenta renderizar um PDF real e verificar a presença da imagem. Nesta máquina, o Chromium localizado falhou por permissão do sandbox; o PDF real não foi homologado nesta entrega.
-- A automação do navegador não ficou disponível nesta sessão. Revisão visual, responsividade e interação em tela cheia ainda precisam de homologação em navegador.
+- Homologação de 27/11/2026: 28 testes Vitest passaram com EdgeCore, incluindo PDF real com imagem. O fluxo API → checkpoint → job → worker → download produziu um PDF de seis páginas 16:9 (960 × 540 pt), 89.228 bytes, job `succeeded` na primeira tentativa e download HTTP 200. As seis páginas foram renderizadas pelo Poppler e inspecionadas visualmente sem cortes ou sobreposições no deck de teste.
+- A revisão visual dos seis slides exportados foi concluída. A revisão interativa do editor (cliques, responsividade e tela cheia) continua bloqueada neste ambiente: o host de acesso ao navegador está indisponível e a captura nativa da janela do Brave expirou em duas tentativas.
 
 Para configurar um backend diferente na prévia Vite, use `DECKAI_API_URL`; o padrão continua `http://127.0.0.1:8788`.

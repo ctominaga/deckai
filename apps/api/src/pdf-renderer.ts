@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import type { PresentationContent } from "@deckai/contracts";
@@ -11,10 +11,17 @@ import { renderPresentationDocument, type RenderAssets } from "@deckai/renderer"
 const runBrowser = promisify(execFile);
 export const maxPdfBytes = 10 * 1024 * 1024;
 
-export function findPdfBrowser(): string | undefined {
+export function findPdfBrowser(platform: NodeJS.Platform = process.platform): string | undefined {
   if (process.env.PDF_BROWSER_PATH) return process.env.PDF_BROWSER_PATH;
-  const candidates = process.platform === "win32"
-    ? ["C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe", "C:/Program Files/Google/Chrome/Application/chrome.exe"]
+  const candidates = platform === "win32"
+    ? [process.env["ProgramFiles(x86)"] ?? "C:/Program Files (x86)", process.env.ProgramFiles ?? "C:/Program Files"].flatMap(root => {
+      const core = win32.join(root, "Microsoft", "EdgeCore");
+      let versions: string[] = [];
+      try { versions = readdirSync(core).filter(version => /^\d+\.\d+\.\d+\.\d+$/.test(version)).sort((a, b) => b.localeCompare(a, "en", { numeric: true })); } catch { /* EdgeCore is optional. */ }
+      return [win32.join(root, "Microsoft", "Edge", "Application", "msedge.exe"),
+        ...versions.map(version => win32.join(core, version, "msedge.exe")),
+        win32.join(root, "Google", "Chrome", "Application", "chrome.exe")];
+    })
     : ["/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome"];
   return candidates.find(candidate => existsSync(candidate));
 }
