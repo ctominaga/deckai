@@ -271,4 +271,20 @@ Retorna o arquivo como anexo para uma sessão da mesma organização. Pedidos ai
 
 No ambiente local, a API roda os workers no mesmo processo e armazena arquivos de até 10 MiB no banco. O PDF imprime uma página 16:9 por slide com Edge, Chrome ou Chromium. Configure `PDF_BROWSER_PATH` para indicar o executável ou `PDF_WORKER_ENABLED=false` para desativar o worker de PDF.
 
-O PPTX usa o JSON da mesma versão salva e gera slides 16:9 com caixas de texto editáveis para títulos, textos e indicadores. Imagens aparecem como texto de placeholder. A composição é própria do PowerPoint e a fidelidade visual ainda precisa de validação com apresentações reais.
+O PPTX usa o JSON da mesma versão salva e gera slides 16:9 com caixas de texto editáveis para títulos, textos e indicadores. Imagens PNG e JPEG da organização entram como objetos de imagem, com proporção preservada. WebP permanece como placeholder no PPTX. A composição é própria do PowerPoint e a fidelidade visual ainda precisa de validação com apresentações reais.
+
+## Imagens privadas
+
+### `POST /api/v1/assets/images`
+
+Owners e editores podem enviar imagens PNG, JPEG ou WebP de até 5 MiB, 8192 pixels por lado e 20 megapixels. Envie o arquivo binário diretamente no corpo da requisição e o tipo no cabeçalho `Content-Type`. O cabeçalho opcional `X-Asset-Name` define o nome de exibição. A API verifica assinatura e dimensões e retorna `201` e `{ asset }`, com `id`, `name`, `mediaType`, `sizeBytes` e `createdAt`.
+
+### `GET /api/v1/assets/images`
+
+Com sessão autenticada, retorna `{ items, nextCursor }` com até 100 imagens da organização. Use `?after=<nextCursor>` para continuar a listagem.
+
+### `GET /api/v1/assets/images/:id`
+
+Retorna o binário para uma sessão da mesma organização, com `Cache-Control: private, no-store`. A interface pode buscar a imagem com a autorização da API e usar um Blob para exibi-la. O armazenamento desta etapa usa o próprio banco.
+
+Para incluir uma imagem, salve seu ID no campo `assetId` de um bloco `image`. A prévia HTML do servidor e o PDF incorporam PNG, JPEG e WebP. Os exportadores e a prévia só resolvem imagens da organização da apresentação. IDs ausentes ou de outra organização aparecem como placeholders. A prévia e os exportadores aceitam até 8 MiB de imagens somadas, contando as repetições. O seletor e a exibição no editor interativo dependem da integração com a interface.

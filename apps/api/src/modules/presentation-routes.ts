@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { CreateCheckpointSchema, CreatePresentationSchema, PresentationContentSchema, SaveDraftSchema, UpdatePresentationSchema, initialPresentationContent, type PresentationContent } from "@deckai/contracts";
 import { renderPresentationDocument } from "@deckai/renderer";
+import { imageDataUrls, loadPresentationImages } from "../presentation-images.js";
 import { audit } from "../audit.js";
 import { authenticate, requireWrite } from "../auth.js";
 import type { Database } from "../database.js";
@@ -136,6 +137,9 @@ export function registerPresentationRoutes(app: FastifyInstance, database: Datab
     const presentation = await scopedPresentation(database, id, user.organizationId);
     const draft = await database.query<DraftRow>(`${draftSelect} WHERE presentation_id=$1 AND organization_id=$2`, [id, user.organizationId]);
     if (!draft.rows[0]) throw notFound("Rascunho");
-    return reply.type("text/html; charset=utf-8").send(renderPresentationDocument(PresentationContentSchema.parse(draft.rows[0].content), presentation.title));
+    const content = PresentationContentSchema.parse(draft.rows[0].content);
+    const images = await loadPresentationImages(database, content, user.organizationId);
+    return reply.type("text/html; charset=utf-8").header("Cache-Control", "private, no-store")
+      .send(renderPresentationDocument(content, presentation.title, imageDataUrls(images)));
   });
 }
